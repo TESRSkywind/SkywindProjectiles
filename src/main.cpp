@@ -52,6 +52,8 @@ static void SKSEMessageHandler(SKSE::MessagingInterface::Message* message)
 {
 	switch (message->type) {
 	case SKSE::MessagingInterface::kDataLoaded:
+		PlayerCharacterHook::Hook();
+
 		Settings::ReadSettings();
 
 		PaddingsProjectileHook::Hook();
@@ -60,6 +62,8 @@ static void SKSEMessageHandler(SKSE::MessagingInterface::Message* message)
 
 		if (Settings::NormLightingsEnabled)
 			NormLightingsHook::Hook();
+
+		AutoAimHook::Hook();
 
 		break;
 	}

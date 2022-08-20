@@ -171,3 +171,40 @@ private:
 
 	static inline REL::Relocation<decltype(Ctor)> _BeamProjectile__ctor;
 };
+
+class AutoAimHook
+{
+public:
+	static void Hook()
+	{
+		_Projectile__apply_gravity =
+			SKSE::GetTrampoline().write_call<5>(REL::ID(43006).address() + 0x69, change_direction);  // SkyrimSE.exe+751309
+	}
+
+private:
+	static bool change_direction(RE::Projectile* proj, RE::NiPoint3* dV, float dtime)
+	{
+		bool ans = _Projectile__apply_gravity(proj, dV, dtime);
+		if (is_AutoAimType(proj)) {
+			AutoAim::change_direction(proj, dV, dtime);
+		}
+		return ans;
+	}
+
+	static inline REL::Relocation<decltype(change_direction)> _Projectile__apply_gravity;
+};
+
+class PlayerCharacterHook
+{
+public:
+	static void Hook() { _Update = REL::Relocation<uintptr_t>(REL::ID(RE::VTABLE_PlayerCharacter[0])).write_vfunc(0xad, Update); }
+
+private:
+	static void Update(RE::PlayerCharacter* a, float delta)
+	{
+		_Update(a, delta);
+		DebugAPI_IMPL::DebugAPI::Update();
+	}
+
+	static inline REL::Relocation<decltype(Update)> _Update;
+};

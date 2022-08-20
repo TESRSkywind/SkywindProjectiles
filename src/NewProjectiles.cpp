@@ -1,14 +1,23 @@
 #include "NewProjectiles.h"
 #include "FenixProjectilesAPI.h"
 
-bool is_CustomPosType(RE::Projectile* proj)
+constexpr FenixProjsType intToType(uint32_t type) { return *(FenixProjsType*)&type; }
+
+bool is_CustomPosType(RE::Projectile* proj) { return intToType(proj->pad164).any(FenixProjsTypes::CustomPos); }
+
+void set_CustomPosType(RE::Projectile* proj)
 {
-	return proj->pad164 == FenixProjs::CustomPosType();
+	proj->pad164 = intToType(proj->pad164).set(FenixProjsTypes::CustomPos).underlying();
 }
 
-void set_CustomPosType(RE::Projectile* proj) { proj->pad164 = FenixProjs::CustomPosType(); }
+bool is_AutoAimType(RE::Projectile* proj) { return intToType(proj->pad164).any(FenixProjsTypes::AutoAim); }
 
-void set_NormalType(RE::Projectile* proj) { proj->pad164 = FenixProjs::NormalType(); }
+void set_AutoAimType(RE::Projectile* proj) {
+	proj->pad164 = intToType(proj->pad164).set(FenixProjsTypes::AutoAim).underlying();
+	proj->flags |= 1 << 6;  // smth like "no gravity". To updating model rotation.
+}
+
+void set_NormalType(RE::Projectile* proj) { proj->pad164 = 0; }
 
 struct Projectile__LaunchData
 {
@@ -159,8 +168,125 @@ uint32_t cast_CustomPos_withsound(RE::Actor* caster, RE::SpellItem* spel, const 
 	return handle;
 }
 
+namespace AutoAim
+{
+	RE::Actor* findTarget(RE::Projectile* proj)
+	{
+		auto target = proj->desiredTarget.get().get();
+		if (target)
+			return target->As<RE::Actor>();
+
+		auto caster = proj->shooter.get().get();
+		if (!caster)
+			return nullptr;
+
+		float mindist2 = 1.0E15f;
+		RE::TESObjectREFR* refr = nullptr;
+		RE::TES::GetSingleton()->ForEachReference([=, &mindist2, &refr](RE::TESObjectREFR& _refr) {
+			if (!_refr.IsDisabled() && !_refr.IsDead() && _refr.GetFormType() == RE::FormType::ActorCharacter &&
+				_refr.formID != caster->formID) {
+				float curdist = proj->GetPosition().GetSquaredDistance(_refr.GetPosition());
+				if (curdist < mindist2) {
+					mindist2 = curdist;
+					refr = &_refr;
+				}
+			}
+			return RE::BSContainer::ForEachResult::kContinue;
+		});
+
+		if (!refr || mindist2 > proj->range * proj->range)
+			return nullptr;
+
+#ifdef DEBUG
+		char sMsgBuff[128] = { 0 };
+		sprintf_s(sMsgBuff, "Target found: %s", refr->GetName());
+		RE::DebugNotification(sMsgBuff);
+#endif  // DEBUG
+
+		proj->desiredTarget = refr->GetHandle();
+		return refr->As<RE::Actor>();
+	}
+
+	RE::NiPoint3 get_victim_pos(RE::Actor* target, float dtime) {
+		if (target->IsDead() || target->IsBleedingOut()) {
+			return target->GetPosition();
+		} else {
+			RE::NiPoint3 ans;
+			_generic_foo_<46045, void(RE::Actor * a, float time, RE::NiPoint3* ans)>::eval(target, dtime, &ans);
+			return ans + RE::NiPoint3{ 0, 0, target->GetHeight() * 0.5f };
+		}
+	}
+
+	void change_direction(RE::Projectile* proj, RE::NiPoint3*, [[maybe_unused]] float dtime) {
+		if (auto target = findTarget(proj)) {
+			const float MIN_DIST = 200.0f, MIN_VEL = 500.0f;
+			const auto B = get_victim_pos(target, 0.5f);
+			auto BA = B - proj->GetPosition();
+			float BA_len = BA.Length();
+			float V_len = proj->linearVelocity.Length();
+
+			float speed = proj->GetBaseObject()->As<RE::BGSProjectile>()->data.speed * proj->GetPowerSpeedMult() * proj->unk18C;
+			float t = proj->lifeRemaining / BA_len * speed * dtime;
+			
+			if (t > 1 || BA_len < MIN_DIST && (proj->linearVelocity.Dot(BA) > 0.9f * BA_len * V_len)) {
+				const auto P = get_victim_pos(target, dtime);
+				auto PA = P - proj->GetPosition();
+				float PA_len = PA.Length();
+				proj->linearVelocity = PA / PA_len * std::max(V_len, MIN_VEL);
+				//draw_line(proj->GetPosition(), proj->GetPosition() + proj->linearVelocity);
+			} else {
+				// A = Start, B = Finish, C = initial vel.
+				// P_1 = A + t (C - A)
+				// P_2 = C + t (B - C)
+				// P   = P_1 + t (P_2 - P_1)
+				//     = A + 2 t (C - A) + t^2 (A + B - 2 C)
+				// P'  = 2 (C - A) + 2 t (A + B - 2 C)
+				// ------------------------
+				// P_1 = P - P' t / 2
+				// P_2 = P_1 + (P - P_1) / t
+				// C   = (P_2 - t B) / (1 - t)
+				// A   = (P_1 - t C) / (1 - t)
+				const auto& P = proj->data.location;
+				const auto P_1 = P - proj->linearVelocity * t / 2;
+				const auto P_2 = P_1 + (P - P_1) / t;
+				const auto C = (P_2 - B * t) / (1 - t);
+				const auto X = (P_1 - C * t) / (1 - t) + B - C * 2;
+				proj->linearVelocity += X * 2 * dtime;
+			}
+
+			/*
+			auto V = target->GetPosition() - proj->GetPosition();
+			auto p = RE::PlayerCharacter::GetSingleton();
+			auto speed = proj->linearVelocity.Length();
+			V.Unitize();
+			V *= speed;
+			V -= proj->linearVelocity;
+			V.Unitize();
+			V *= p->GetActorValue(RE::ActorValue::kStamina);
+			//float len = U.Cross(V).Unitize();
+			speed = 2500.0f / 2.0f;
+			proj->linearVelocity += V;
+			float newspeed = proj->linearVelocity.Length();
+			proj->linearVelocity *= speed / newspeed;
+			*/
+
+			_generic_foo_<43010, void(RE::TESObjectREFR * a, const RE::NiPoint3& P)>::eval(proj,
+				proj->GetPosition() + proj->linearVelocity);
+			
+		} else {
+			set_NormalType(proj);
+		}
+	}
+}
+
 extern "C" 
 {
+	DLLEXPORT void FenixProjectilesAPI_set_NormalType(RE::Projectile* proj) { return set_NormalType(proj); }
+
+	DLLEXPORT void FenixProjectilesAPI_set_CustomPosType(RE::Projectile* proj) { return set_CustomPosType(proj); }
+
+	DLLEXPORT void FenixProjectilesAPI_set_AutoAimType(RE::Projectile* proj) { return set_AutoAimType(proj); }
+
 	DLLEXPORT uint32_t FenixProjectilesAPI_cast(RE::Actor* caster, RE::SpellItem* spel, const RE::NiPoint3& start_pos,
 		const ProjectileRot& rot)
 	{
