@@ -77,6 +77,7 @@ set(Boost_USE_STATIC_LIBS ON)
 add_subdirectory($ENV{UselessFenixUtils} ./UselessFenixUtils/build)
 
 find_package(spdlog REQUIRED CONFIG)
+find_package(jsoncpp REQUIRED CONFIG)
 
 # ---- Add source files ----
 
@@ -136,6 +137,7 @@ target_link_libraries(
 		CommonLibSSE::CommonLibSSE
 		UselessFenixUtils::UselessFenixUtils
 		spdlog::spdlog
+		JsonCpp::JsonCpp
 )
 
 if (MSVC)

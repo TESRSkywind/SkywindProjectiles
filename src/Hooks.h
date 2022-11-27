@@ -194,6 +194,28 @@ private:
 	static inline REL::Relocation<decltype(change_direction)> _Projectile__apply_gravity;
 };
 
+class CoolFireballHook
+{
+public:
+	static void Hook()
+	{
+		_MissileProjectile__ctor =
+			SKSE::GetTrampoline().write_call<5>(REL::ID(42928).address() + 0x219, Ctor);  // SkyrimSE.exe+74B389
+	}
+
+private:
+	static RE::MissileProjectile* Ctor(RE::MissileProjectile* proj, void* LaunchData)
+	{
+		proj = _MissileProjectile__ctor(proj, LaunchData);
+		if (auto type = is_homie(proj); type.first != AutoAimTypes::Normal) {
+			set_AutoAimType(proj, type);
+		}
+		return proj;
+	}
+
+	static inline REL::Relocation<decltype(Ctor)> _MissileProjectile__ctor;
+};
+
 class PlayerCharacterHook
 {
 public:

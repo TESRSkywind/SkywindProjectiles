@@ -65,6 +65,9 @@ static void SKSEMessageHandler(SKSE::MessagingInterface::Message* message)
 
 		AutoAimHook::Hook();
 
+		read_json();
+		CoolFireballHook::Hook();
+
 		break;
 	}
 }

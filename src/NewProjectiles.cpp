@@ -1,23 +1,54 @@
 #include "NewProjectiles.h"
 #include "FenixProjectilesAPI.h"
 
-constexpr FenixProjsType intToType(uint32_t type) { return *(FenixProjsType*)&type; }
+FenixProjsType& get_proj_type(RE::Projectile* proj) { return (FenixProjsType&)(uint32_t&)proj->pad164; }
 
-bool is_CustomPosType(RE::Projectile* proj) { return intToType(proj->pad164).any(FenixProjsTypes::CustomPos); }
+bool is_CustomPosType(RE::Projectile* proj) { return get_proj_type(proj).isCustomPos(); }
+void set_CustomPosType(RE::Projectile* proj) { get_proj_type(proj).setCustomPos(); }
 
-void set_CustomPosType(RE::Projectile* proj)
+bool is_AutoAimType(RE::Projectile* proj) { return get_proj_type(proj).isAutoAim(); }
+AutoAimTypes get_AutoAimType(RE::Projectile* proj) { return get_proj_type(proj).autoAimType(); }
+uint32_t get_AutoAimParam(RE::Projectile* proj) { return get_proj_type(proj).get_AutoAimParam(); }
+void set_AutoAimType(RE::Projectile* proj, AutoAimData_t type)
 {
-	proj->pad164 = intToType(proj->pad164).set(FenixProjsTypes::CustomPos).underlying();
-}
-
-bool is_AutoAimType(RE::Projectile* proj) { return intToType(proj->pad164).any(FenixProjsTypes::AutoAim); }
-
-void set_AutoAimType(RE::Projectile* proj) {
-	proj->pad164 = intToType(proj->pad164).set(FenixProjsTypes::AutoAim).underlying();
+	get_proj_type(proj).set_AutoAim(type.first);
+	get_proj_type(proj).set_AutoAimParam(type.second.param);
 	proj->flags |= 1 << 6;  // smth like "no gravity". To updating model rotation.
 }
 
-void set_NormalType(RE::Projectile* proj) { proj->pad164 = 0; }
+void set_NormalType(RE::Projectile* proj) { get_proj_type(proj).set_NormalType(); }
+
+using HomieType = std::unordered_map<uint32_t, JsonData>;
+
+HomieType ConstSpeed;  // Const Speed
+HomieType ConstAccel;  // Const Acceleration
+
+auto findHomie(const HomieType& storage, RE::Projectile* proj)
+{
+	auto _bproj = proj->GetBaseObject();
+	if (auto bproj = _bproj ? _bproj->As<RE::BGSProjectile>() : nullptr) {
+		auto formid = bproj->formID;
+		return storage.find(formid);
+	} else {
+		return storage.end();
+	}
+}
+
+AutoAimData_t is_homie(RE::Projectile* proj)
+{
+	if (auto found = findHomie(ConstAccel, proj); found != ConstAccel.end()) {
+		return { AutoAimTypes::ConstAcc, (*found).second };
+	}
+
+	if (auto found = findHomie(ConstSpeed, proj); found != ConstSpeed.end()) {
+		return { AutoAimTypes::ConstSpeed, (*found).second };
+	}
+
+	JsonData data;
+	data.param = 0;
+	data.target = AutoAimTarget::Nearest;
+	return { AutoAimTypes::Normal, data };
+}
 
 struct Projectile__LaunchData
 {
@@ -168,23 +199,30 @@ uint32_t cast_CustomPos_withsound(RE::Actor* caster, RE::SpellItem* spel, const 
 	return handle;
 }
 
+RE::NiPoint3* get_eye_pos(RE::Actor* me, const RE::NiPoint3& ans, int mb_type)
+{
+	return _generic_foo_<36755, decltype(get_eye_pos)>::eval(me, ans, mb_type);
+}
+
 namespace AutoAim
 {
-	RE::Actor* findTarget(RE::Projectile* proj)
+	bool is_hostile(RE::TESObjectREFR* refr, RE::TESObjectREFR* _caster)
 	{
-		auto target = proj->desiredTarget.get().get();
-		if (target)
-			return target->As<RE::Actor>();
+		auto target = refr->As<RE::Actor>();
+		auto caster = _caster->As<RE::Actor>();
+		if (!target || !caster)
+			return false;
 
-		auto caster = proj->shooter.get().get();
-		if (!caster)
-			return nullptr;
+		return target->currentCombatTarget.get().get() == caster;
+	}
 
+	RE::TESObjectREFR* find_nearest_target(RE::TESObjectREFR* caster, RE::Projectile* proj, bool onlyHostile)
+	{
 		float mindist2 = 1.0E15f;
 		RE::TESObjectREFR* refr = nullptr;
 		RE::TES::GetSingleton()->ForEachReference([=, &mindist2, &refr](RE::TESObjectREFR& _refr) {
 			if (!_refr.IsDisabled() && !_refr.IsDead() && _refr.GetFormType() == RE::FormType::ActorCharacter &&
-				_refr.formID != caster->formID) {
+				_refr.formID != caster->formID && (!onlyHostile || is_hostile(&_refr, caster))) {
 				float curdist = proj->GetPosition().GetSquaredDistance(_refr.GetPosition());
 				if (curdist < mindist2) {
 					mindist2 = curdist;
@@ -197,6 +235,77 @@ namespace AutoAim
 		if (!refr || mindist2 > proj->range * proj->range)
 			return nullptr;
 
+		return refr;
+	}
+
+	RE::TESObjectREFR* find_cursor_target(RE::TESObjectREFR* _caster)
+	{
+		if (!_caster->IsPlayerRef())
+			return nullptr;
+
+		auto caster = _caster->As<RE::Actor>();
+
+		RE::NiPoint3 ray_start, ray_end;
+		
+		FenixUtils::Actor__get_eye_pos(caster, &ray_start, 2);
+
+		ray_end = ray_start;
+		float reach = 10000;
+		if (caster->IsPlayerRef()) {
+			ray_end += FenixUtils::rotate(reach, caster->data.angle);
+		} else {
+			ray_end += (caster->data.location - ray_end) * 0.25f;
+			ray_end += FenixUtils::rotateZ(reach, caster->data.angle);
+		}
+
+		auto havokWorldScale = RE::bhkWorld::GetWorldScale();
+		RE::bhkPickData pick_data;
+		pick_data.rayInput.from = ray_start * havokWorldScale;
+		pick_data.rayInput.to = ray_end * havokWorldScale;
+
+		uint32_t col_info = 0;
+		caster->GetCollisionFilterInfo(col_info);
+		pick_data.rayInput.filterInfo =
+			(static_cast<uint32_t>(col_info >> 16) << 16) | static_cast<uint32_t>(RE::COL_LAYER::kCharController);
+
+		caster->GetParentCell()->GetbhkWorld()->PickObject(pick_data);
+
+		if (pick_data.rayOutput.HasHit()) {
+			if (auto collidable = pick_data.rayOutput.rootCollidable) {
+				return RE::TESHavokUtilities::FindCollidableRef(*collidable);
+			}
+		}
+		return nullptr;
+	}
+
+	RE::Actor* findTarget(RE::Projectile* proj)
+	{
+		auto target = proj->desiredTarget.get().get();
+		if (target)
+			return target->As<RE::Actor>();
+
+		auto caster = proj->shooter.get().get();
+		if (!caster)
+			return nullptr;
+
+		RE::TESObjectREFR* refr;
+		auto target_type = is_homie(proj).second.target;
+		switch (target_type) {
+		case AutoAimTarget::Nearest:
+		case AutoAimTarget::NearestHostile:
+			refr = find_nearest_target(caster, proj, target_type == AutoAimTarget::NearestHostile);
+			break;
+		case AutoAimTarget::AtCursor:
+			refr = find_cursor_target(caster);
+			break;
+		default:
+			refr = nullptr;
+			break;
+		}
+
+		if (!refr)
+			return nullptr;
+
 #ifdef DEBUG
 		char sMsgBuff[128] = { 0 };
 		sprintf_s(sMsgBuff, "Target found: %s", refr->GetName());
@@ -207,74 +316,211 @@ namespace AutoAim
 		return refr->As<RE::Actor>();
 	}
 
-	RE::NiPoint3 get_victim_pos(RE::Actor* target, float dtime) {
-		if (target->IsDead() || target->IsBleedingOut()) {
-			return target->GetPosition();
+	RE::NiPoint3 get_victim_pos(RE::Actor* target, float dtime)
+	{
+		RE::NiPoint3 ans, eye_pos;
+		target->GetLinearVelocity(ans);
+		ans *= dtime;
+		get_eye_pos(target, eye_pos, 2);
+		ans += eye_pos;
+		return ans;
+	}
+	
+	float get_proj_speed(RE::Projectile* proj) {
+		return proj->GetBaseObject()->As<RE::BGSProjectile>()->data.speed * proj->GetPowerSpeedMult() * proj->speedMult;
+	}
+
+	bool get_shoot_dir(RE::Projectile* proj, RE::Actor* target, float dtime, RE::NiPoint3& ans) {
+		RE::NiPoint3 target_dir;
+		target->GetLinearVelocity(target_dir);
+		double target_speed = target_dir.Length();
+
+		double proj_speed = get_proj_speed(proj);
+
+		auto target_pos = get_victim_pos(target, dtime);
+		auto strait_dir = target_pos - proj->GetPosition();
+
+		double a = proj_speed * proj_speed - target_speed * target_speed;
+
+		double strait_len = strait_dir.Unitize();
+		double c = -(strait_len * strait_len);
+		double b;
+
+		if (target_speed > 0.0001) {
+			target_dir.Unitize();
+			double cos_phi = -target_dir.Dot(strait_dir);
+			b = 2 * strait_len * target_speed * cos_phi;
 		} else {
-			RE::NiPoint3 ans;
-			_generic_foo_<46045, void(RE::Actor * a, float time, RE::NiPoint3* ans)>::eval(target, dtime, &ans);
-			return ans + RE::NiPoint3{ 0, 0, target->GetHeight() * 0.5f };
+			b = 0.0;
 		}
+
+		double D = b * b - 4 * a * c;
+		if (D < 0)
+			return false;
+		
+		D = sqrt(D);
+		double t1 = (-b + D) / a * 0.5;
+		double t2 = (-b - D) / a * 0.5;
+
+		if (t1 <= 0 && t2 <= 0)
+			return false;
+
+		double t = t1;
+		if (t2 > 0 && t2 < t1)
+			t = t2;
+
+		ans = target_dir * (float)target_speed + strait_dir * (float)(strait_len / t);
+		return true;
+	}
+
+	// constant speed, limited rotation angle
+	void change_direction_1(RE::Projectile* proj, float dtime, const RE::NiPoint3& final_vel, uint32_t param)
+	{
+		auto get_rotation_speed = []([[maybe_unused]] RE::Projectile* proj, uint32_t param) {
+			// param / 100 = time to rotate at 180
+			// 250 350 500 norm
+			return 3.14159265358979323f / (static_cast<float>(param) * 0.01f);
+		};
+
+		auto final_dir = final_vel;
+		final_dir.Unitize();
+		auto old_dir = proj->linearVelocity;
+		old_dir.Unitize();
+
+		float max_angle = get_rotation_speed(proj, param) * dtime;
+		float angle = acos(old_dir.Dot(final_dir));
+		auto axis = old_dir.UnitCross(final_dir);
+
+		float phi = fmin(max_angle, angle);
+		float cos_phi = cos(phi);
+		float sin_phi = sin(phi);
+		float one_cos_phi = 1 - cos_phi;
+		RE::NiMatrix3 R = { { cos_phi + one_cos_phi * axis.x * axis.x, axis.x * axis.y * one_cos_phi - axis.z * sin_phi,
+								axis.x * axis.z * one_cos_phi + axis.y * sin_phi },
+			{ axis.y * axis.x * one_cos_phi + axis.z * sin_phi, cos_phi + axis.y * axis.y * one_cos_phi,
+				axis.y * axis.z * one_cos_phi - axis.x * sin_phi },
+			{ axis.z * axis.x * one_cos_phi - axis.y * sin_phi, axis.z * axis.y * one_cos_phi + axis.x * sin_phi,
+				cos_phi + axis.z * axis.z * one_cos_phi } };
+
+		proj->linearVelocity = (R * old_dir) * proj->linearVelocity.Length();
+	}
+
+	// constant acceleration length
+	void change_direction_2(RE::Projectile* proj, [[maybe_unused]] float dtime, const RE::NiPoint3& final_vel, uint32_t param)
+	{
+		auto get_acceleration = []([[maybe_unused]] RE::Projectile* proj, uint32_t param) {
+			// param / 10 = acceleration vector length
+			// 50 100 500
+			return static_cast<float>(param) * 0.1f;
+		};
+
+		auto V = final_vel;
+		auto speed = proj->linearVelocity.Length();
+		V.Unitize();
+		V *= speed;
+		V -= proj->linearVelocity;
+		V.Unitize();
+		V *= get_acceleration(proj, param);
+		speed = get_proj_speed(proj);
+		proj->linearVelocity += V;
+		float newspeed = proj->linearVelocity.Length();
+		proj->linearVelocity *= speed / newspeed;
 	}
 
 	void change_direction(RE::Projectile* proj, RE::NiPoint3*, [[maybe_unused]] float dtime) {
 		if (auto target = findTarget(proj)) {
-			const float MIN_DIST = 200.0f, MIN_VEL = 500.0f;
-			const auto B = get_victim_pos(target, 0.5f);
-			auto BA = B - proj->GetPosition();
-			float BA_len = BA.Length();
-			float V_len = proj->linearVelocity.Length();
 
-			float speed = proj->GetBaseObject()->As<RE::BGSProjectile>()->data.speed * proj->GetPowerSpeedMult() * proj->unk18C;
-			float t = proj->lifeRemaining / BA_len * speed * dtime;
-			
-			if (t > 1 || BA_len < MIN_DIST && (proj->linearVelocity.Dot(BA) > 0.9f * BA_len * V_len)) {
-				const auto P = get_victim_pos(target, dtime);
-				auto PA = P - proj->GetPosition();
-				float PA_len = PA.Length();
-				proj->linearVelocity = PA / PA_len * std::max(V_len, MIN_VEL);
-				//draw_line(proj->GetPosition(), proj->GetPosition() + proj->linearVelocity);
-			} else {
-				// A = Start, B = Finish, C = initial vel.
-				// P_1 = A + t (C - A)
-				// P_2 = C + t (B - C)
-				// P   = P_1 + t (P_2 - P_1)
-				//     = A + 2 t (C - A) + t^2 (A + B - 2 C)
-				// P'  = 2 (C - A) + 2 t (A + B - 2 C)
-				// ------------------------
-				// P_1 = P - P' t / 2
-				// P_2 = P_1 + (P - P_1) / t
-				// C   = (P_2 - t B) / (1 - t)
-				// A   = (P_1 - t C) / (1 - t)
-				const auto& P = proj->data.location;
-				const auto P_1 = P - proj->linearVelocity * t / 2;
-				const auto P_2 = P_1 + (P - P_1) / t;
-				const auto C = (P_2 - B * t) / (1 - t);
-				const auto X = (P_1 - C * t) / (1 - t) + B - C * 2;
-				proj->linearVelocity += X * 2 * dtime;
+			RE::NiPoint3 final_vel;
+			if (!get_shoot_dir(proj, target, dtime, final_vel))
+				return set_NormalType(proj);
+
+			auto type = get_AutoAimType(proj);
+			auto param = get_AutoAimParam(proj);
+			switch (type) {
+			case AutoAimTypes::ConstSpeed:
+				change_direction_1(proj, dtime, final_vel, param);
+				break;
+			case AutoAimTypes::ConstAcc:
+				change_direction_2(proj, dtime, final_vel, param);
+				break;
+			default:
+				break;
 			}
 
-			/*
-			auto V = target->GetPosition() - proj->GetPosition();
-			auto p = RE::PlayerCharacter::GetSingleton();
-			auto speed = proj->linearVelocity.Length();
-			V.Unitize();
-			V *= speed;
-			V -= proj->linearVelocity;
-			V.Unitize();
-			V *= p->GetActorValue(RE::ActorValue::kStamina);
-			//float len = U.Cross(V).Unitize();
-			speed = 2500.0f / 2.0f;
-			proj->linearVelocity += V;
-			float newspeed = proj->linearVelocity.Length();
-			proj->linearVelocity *= speed / newspeed;
-			*/
+#ifdef DEBUG
+			{
+				auto proj_dir = proj->linearVelocity;
+				proj_dir.Unitize();
+				draw_line<Colors::RED>(proj->GetPosition(), proj->GetPosition() + proj_dir);
+			}
+#endif  // DEBUG
 
+			// update rotation
 			_generic_foo_<43010, void(RE::TESObjectREFR * a, const RE::NiPoint3& P)>::eval(proj,
 				proj->GetPosition() + proj->linearVelocity);
-			
 		} else {
 			set_NormalType(proj);
+		}
+	}
+}
+
+#include "json/json.h"
+
+int get_mod_index(const std::string_view& name)
+{
+	auto esp = RE::TESDataHandler::GetSingleton()->LookupModByName(name);
+	if (!esp)
+		return -1;
+
+	return !esp->IsLight() ? esp->compileIndex << 24 : (0xFE000 | esp->smallFileCompileIndex) << 12;
+}
+
+AutoAimTarget read_json_(const std::string& s)
+{
+	if (s == "cursor")
+		return AutoAimTarget::AtCursor;
+	if (s == "hostile")
+		return AutoAimTarget::NearestHostile;
+	if (s == "nearest")
+		return AutoAimTarget::Nearest;
+
+	return AutoAimTarget::Nearest;
+}
+
+void read_json_(HomieType& storage, const Json::Value& items, int hex)
+{
+	for (int i = 0; i < (int)items.size(); i++) {
+		const auto& item = items[i];
+		uint32_t formid = std::stoul(item[0].asString(), nullptr, 16);
+
+		JsonData data;
+		data.param = item[1].asUInt();
+		data.target = read_json_(item[2].asString());
+		storage.insert({ hex | formid, data });
+	}
+}
+
+void read_json()
+{
+	Json::Value json_root;
+	std::ifstream ifs;
+	ifs.open("Data/HomingProjectiles/HomieSpells.json");
+	ifs >> json_root;
+	ifs.close();
+
+	for (auto& mod_name : json_root.getMemberNames()) {
+		int hex = get_mod_index(mod_name);
+		if (hex == -1) {
+			logger::warn("mod {} not found", mod_name);
+			continue;
+		}
+
+		const auto& mod_data = json_root[mod_name];
+		for (auto& type : mod_data.getMemberNames()) {
+			if (type == "ConstSpeed")
+				read_json_(ConstSpeed, mod_data[type], hex);
+			else if (type == "ConstAccel")
+				read_json_(ConstAccel, mod_data[type], hex);
 		}
 	}
 }
@@ -284,8 +530,6 @@ extern "C"
 	DLLEXPORT void FenixProjectilesAPI_set_NormalType(RE::Projectile* proj) { return set_NormalType(proj); }
 
 	DLLEXPORT void FenixProjectilesAPI_set_CustomPosType(RE::Projectile* proj) { return set_CustomPosType(proj); }
-
-	DLLEXPORT void FenixProjectilesAPI_set_AutoAimType(RE::Projectile* proj) { return set_AutoAimType(proj); }
 
 	DLLEXPORT uint32_t FenixProjectilesAPI_cast(RE::Actor* caster, RE::SpellItem* spel, const RE::NiPoint3& start_pos,
 		const ProjectileRot& rot)
