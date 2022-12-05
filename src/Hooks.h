@@ -194,7 +194,7 @@ private:
 	static inline REL::Relocation<decltype(change_direction)> _Projectile__apply_gravity;
 };
 
-class CoolFireballHook
+class SetNewTypeHook
 {
 public:
 	static void Hook()
@@ -207,8 +207,17 @@ private:
 	static RE::MissileProjectile* Ctor(RE::MissileProjectile* proj, void* LaunchData)
 	{
 		proj = _MissileProjectile__ctor(proj, LaunchData);
-		if (auto type = is_homie(proj); type.first != AutoAimTypes::Normal) {
-			set_AutoAimType(proj, type);
+
+		using namespace AutoAim;
+		if (auto type = AutoAim::is_homie(proj->GetBaseObject()); type.first != AutoAimTypes::Normal) {
+			if (auto caster = proj->shooter.get().get()) {
+				bool isPlayer = caster->IsPlayerRef();
+				using Caster_t = FenixProjsAutoAimData::AutoAimCaster;
+				if (type.second.caster == Caster_t::NPC && !isPlayer || type.second.caster == Caster_t::Player && isPlayer ||
+					type.second.caster == Caster_t::Both) {
+					set_AutoAimType(proj, type);
+				}
+			}
 		}
 		return proj;
 	}
@@ -216,7 +225,47 @@ private:
 	static inline REL::Relocation<decltype(Ctor)> _MissileProjectile__ctor;
 };
 
-class PlayerCharacterHook
+class ManyProjsHook
+{
+public:
+	static void Hook()
+	{
+		_castProjectile =
+			SKSE::GetTrampoline().write_call<5>(REL::ID(33670).address() + 0x575, castProjectile);  // SkyrimSE.exe+5504F5
+	}
+
+private:
+	static bool castProjectile(RE::MagicCaster* a, RE::BGSProjectile* bproj, RE::Actor* a_char, RE::CombatController* a4,
+		RE::NiPoint3* startPos, float rotationZ, float rotationX, uint32_t area, void* a9)
+	{
+		if (!ManyProjs::is_ManyCast(bproj))
+			return _castProjectile(a, bproj, a_char, a4, startPos, rotationZ, rotationX, area, a9);
+	
+		ManyProjs::onManyCasted(a, a_char, startPos, { rotationX, rotationZ });
+
+		return true;
+	}
+
+	static inline REL::Relocation<decltype(castProjectile)> _castProjectile;
+};
+
+class DebugAPIHook
+{
+public:
+	static void Hook() { _Update = REL::Relocation<uintptr_t>(REL::ID(RE::VTABLE_PlayerCharacter[0])).write_vfunc(0xad, Update); }
+
+private:
+
+	static void Update(RE::PlayerCharacter* a, float delta)
+	{
+		_Update(a, delta);
+		DebugAPI_IMPL::DebugAPI::Update();
+	}
+
+	static inline REL::Relocation<decltype(Update)> _Update;
+};
+
+class CursorDetectedHook
 {
 public:
 	static void Hook() { _Update = REL::Relocation<uintptr_t>(REL::ID(RE::VTABLE_PlayerCharacter[0])).write_vfunc(0xad, Update); }
@@ -225,7 +274,66 @@ private:
 	static void Update(RE::PlayerCharacter* a, float delta)
 	{
 		_Update(a, delta);
-		DebugAPI_IMPL::DebugAPI::Update();
+
+		if (auto obj = a->GetEquippedObject(false))
+			if (auto spel = obj->As<RE::SpellItem>())
+				if (auto mgef = FenixUtils::getAVEffectSetting(spel))
+					if (auto target = AutoAim::find_cursor_target(a,
+							static_cast<float>(AutoAim::is_homie(mgef->data.projectileBase).second.param2)))
+						draw_line(a->GetPosition(), target->GetPosition(), 5, 0);
+	}
+
+	static inline REL::Relocation<decltype(Update)> _Update;
+};
+
+class CursorCircleHook
+{
+public:
+	static void Hook()
+	{
+		_Update = REL::Relocation<uintptr_t>(REL::ID(RE::VTABLE_PlayerCharacter[0]))
+		              .write_vfunc(0xad, Update);
+	}
+
+private:
+	static void Update(RE::PlayerCharacter* a, float delta)
+	{
+		_Update(a, delta);
+
+		if (auto obj = a->GetEquippedObject(false))
+			if (auto spel = obj->As<RE::SpellItem>())
+				if (auto mgef = FenixUtils::getAVEffectSetting(spel)) {
+					float alpha_max = static_cast<float>(
+						AutoAim::is_homie(mgef->data.projectileBase).second.param2);
+					alpha_max = alpha_max / 180.0f * 3.1415926f;
+
+					RE::NiPoint3 origin, caster_dir;
+					FenixUtils::Actor__get_eye_pos(a, origin, 2);
+
+					const float circle_dist = 2000;
+					caster_dir = FenixUtils::rotate(1, a->data.angle);
+
+					float circle_r = circle_dist * tan(alpha_max);
+					RE::NiPoint3 right_dir = RE::NiPoint3(0, 0, -1).UnitCross(caster_dir);
+					if (right_dir.SqrLength() == 0)
+						right_dir = { 1, 0, 0 };
+					right_dir *= circle_r;
+					RE::NiPoint3 up_dir = right_dir.Cross(caster_dir);
+
+					origin += caster_dir * circle_dist;
+
+					RE::NiPoint3 old = origin + right_dir;
+					const int N = 31;
+					for (int i = 1; i <= N; i++) {
+						float alpha = 2 * 3.1415926f / N * i;
+
+						auto cur_p =
+							origin + right_dir * cos(alpha) + up_dir * sin(alpha);
+
+						draw_line(old, cur_p, 5, 0);
+						old = cur_p;
+					}
+				}
 	}
 
 	static inline REL::Relocation<decltype(Update)> _Update;

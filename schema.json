@@ -1,0 +1,179 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "MCM Config",
+  "description": "Defines MCM Config layout",
+  "type": "object",
+  "patternProperties": { "^[^\\\/:*?\"<>|']+.es[lmp]$": { "$ref": "#/$defs/ModConfig" } },
+  "additionalProperties": false,
+
+  "$defs": {
+    "editorID": {
+      "type": "string",
+      "description": "Any comment. Ignored while parsing."
+    },
+    "pluginName": {
+      "description": "xEdit plugin name (e.g. \"FenixMod.esp\")",
+      "type": "string",
+      "pattern": "^[^\\\/:*?\"<>|']+.es[lmp]$"
+    },
+    "formID": {
+      "description": "Form id of xedit record",
+      "type": "string",
+      "pattern": "^0x[0-9a-fA-F]{1,8}$"
+    },
+    "HomingTypes": {
+      "description": "Type of homing trajectories",
+      "enum": [ "ConstSpeed", "ConstAccel" ]
+    },
+    "HomingCasters": {
+      "description": "Who can cast homing version of the projectile (Default: both)",
+      "enum": [ "Both", "NPC", "Player" ]
+    },
+    "HomingTargets": {
+      "description": "How to capture target",
+      "enum": [ "Cursor", "Nearest", "Hostile" ]
+    },
+    "MultiCastShape": {
+      "description": "How to position projectiles",
+      "enum": [ "Single", "HorisontalLine", "VerticalLine", "Circle", "FillSquare", "Custom"  ]
+    },
+    "MultiCastRotation": {
+      "description": "How to rotate projectiles (default: Parallel)",
+      "enum": [ "Parallel", "ToSight" ]
+    },
+
+    "Homing": {
+      "type": "object",
+      "patternProperties": { "^0x[0-9a-fA-F]{1,8}$": {
+        "type": "object",
+        "properties": {
+          "editorID": { "$ref": "#/$defs/editorID" },
+          "type": { "$ref": "#/$defs/HomingTypes" },
+          "caster": { "$ref": "#/$defs/HomingCasters" },
+          "target": { "$ref": "#/$defs/HomingTargets" }
+        },
+        "allOf": [
+          {
+            "$comment": "RotationTime for ConstSpeed type",
+            "if": {
+              "properties": {
+                "type": { "const": "ConstSpeed" }
+              }
+            },
+            "then": {
+              "properties": {
+                "rotationTime": {
+                  "type": "integer",
+                  "description": "Time needed to rotate at 180 deg, multiplied by 100 (500, 350, 250 are nice)"
+                }
+              },
+              "required": ["rotationTime"]
+            }
+          },
+          {
+            "$comment": "Acceleration for ConstAccel type",
+            "if": {
+              "properties": {
+                "type": { "const": "ConstAccel" }
+              }
+            },
+            "then": {
+              "properties": {
+                "acceleration": {
+                  "type": "integer",
+                  "description": "Acceleration length, multiplied by 10 (50, 100, 500 are nice)"
+                }
+              },
+              "required": ["acceleration"]
+            }
+          },
+          {
+            "$comment": "Acceleration for ConstAccel type",
+            "if": {
+              "properties": {
+                "target": { "const": "Cursor" }
+              }
+            },
+            "then": {
+              "properties": {
+                "cursorAngle": {
+                  "type": "integer",
+                  "description": "Angle of cone for detecting targets near the cursor (5-15 are nice)"
+                }
+              },
+              "required": ["cursorAngle"]
+            }
+          }
+        ],
+        
+        "required": [ "type", "target" ],
+        "unevaluatedProperties": false
+      } },
+      
+      "additionalProperties": false,
+      "description": "Configure homing spells"
+    },
+
+    "Multicast": {
+      "type": "object",
+      "patternProperties": { "^0x[0-9a-fA-F]{1,8}$": {
+        "type": "object",
+        "properties": {
+          "editorID": { "$ref": "#/$defs/editorID" },
+          "shape": { "$ref": "#/$defs/MultiCastShape" }
+        },
+        "required": [ "shape" ],
+        "unevaluatedProperties": false,
+        "allOf": [
+          {
+            "$comment": "Custom shape, additional data for each projectile (group)",
+            "if": {
+              "properties": {
+                "shape": { "const": "Custom" }
+              }
+            },
+            "then": {
+
+            }
+          },
+          {
+            "$comment": "Regular shape, only type and size needed",
+            "if": {
+              "properties": {
+                "shape": { "enum": [ "HorisontalLine", "VerticalLine", "Circle", "FillSquare" ] }
+              }
+            },
+            "then": {
+              "properties": {
+                "size": {
+                  "type": "integer",
+                  "description": "Shape size (usually 50--200)"
+                },
+                "count": {
+                  "type": "integer",
+                  "description": "Number of projectiles to spawn (usually 50--200)",
+                  "minimum": 1
+                },
+                "rotation": { "$ref": "#/$defs/MultiCastRotation" }
+              },
+              "required": [ "size", "count" ]
+            }
+          }
+        ]
+      } },
+      
+      "additionalProperties": false,
+      "description": "Configure multicast spells"
+    },
+
+    "ModConfig": {
+      "type": "object",
+      "description": "Configure projectiles in the mod",
+      "properties": {
+        "Homing": { "$ref": "#/$defs/Homing" },
+        "Multicast": { "$ref": "#/$defs/Multicast" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

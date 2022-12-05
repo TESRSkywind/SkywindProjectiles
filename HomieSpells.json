@@ -1,0 +1,120 @@
+{
+	"Skyrim.esm": {
+		"Homing": {
+			"0x2F774":
+			{
+				"editorID": "FrostIcicleProjectile01",
+				"type": "ConstSpeed",
+				"caster": "Both",
+				"target": "Nearest",
+				"rotationTime": 250
+			},
+			"0x10FBED":
+			{
+				"editorID": "FireBallProjectile01",
+				"type": "ConstAccel",
+				"caster": "Both",
+				"target": "Cursor",
+				"cursorAngle": 5,
+				"acceleration": 500
+			},
+			"0x12e84":
+			{
+				"editorID": "FireboltProjectile01",
+				"type": "ConstAccel",
+				"caster": "Both",
+				"acceleration": 500,
+				"target": "Hostile"
+			}
+		},
+		"Multicast": {
+			"0x10FBED": {
+				"editorID": "FireBallProjectile01",
+				"shape": "Circle",
+				"size": 100,
+				"count": 10
+			},
+			"0xA9D92": {
+				"editorID": "ShockBoltAimChain",
+				"shape": "Circle",
+				"rotation": "Parallel",
+				"size": 50,
+				"count": 10
+			}
+		}
+	},
+
+	"HomingProjectiles.esp": {
+		"Homing": {
+			"0x803": {
+				"type": "ConstSpeed",
+				"caster": "Both",
+				"target": "Hostile",
+				"rotationTime": 500
+			},
+			"0x804": {
+				"type": "ConstSpeed",
+				"caster": "Both",
+				"target": "Nearest",
+				"rotationTime": 350
+			},
+			"0x805": {
+				"type": "ConstSpeed",
+				"caster": "Both",
+				"target": "Cursor",
+				"rotationTime": 250,
+				"cursorAngle": 10
+			},
+			"0x800": {
+				"type": "ConstAccel",
+				"caster": "Both",
+				"target": "Nearest",
+				"acceleration": 50
+			},
+			"0x801": {
+				"type": "ConstAccel",
+				"caster": "Both",
+				"target": "Nearest",
+				"acceleration": 100
+			},
+			"0x802": {
+				"type": "ConstAccel",
+				"caster": "Both",
+				"target": "Nearest",
+				"acceleration": 500
+			}
+		},
+		"Multicast": {
+			"0x803": {
+				"shape": "HorisontalLine",
+				"rotation": "Parallel",
+				"size": 150,
+				"count": 10
+			},
+			"0x804": {
+				"shape": "VerticalLine",
+				"rotation": "Parallel",
+				"size": 50,
+				"count": 10
+			},
+			"0x805": {
+				"shape": "Circle",
+				"rotation": "Parallel",
+				"size": 50,
+				"count": 10
+			},
+			"0x800": {
+				"shape": "FillSquare",
+				"rotation": "Parallel",
+				"size": 100,
+				"count": 9
+			},
+			"0x801": {
+				"shape": "FillSquare",
+				"rotation": "Parallel",
+				"size": 150,
+				"count": 16
+			}
+		}
+	}
+}

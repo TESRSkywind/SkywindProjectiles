@@ -52,8 +52,6 @@ static void SKSEMessageHandler(SKSE::MessagingInterface::Message* message)
 {
 	switch (message->type) {
 	case SKSE::MessagingInterface::kDataLoaded:
-		PlayerCharacterHook::Hook();
-
 		Settings::ReadSettings();
 
 		PaddingsProjectileHook::Hook();
@@ -66,7 +64,21 @@ static void SKSEMessageHandler(SKSE::MessagingInterface::Message* message)
 		AutoAimHook::Hook();
 
 		read_json();
-		CoolFireballHook::Hook();
+		SetNewTypeHook::Hook();
+
+		ManyProjsHook::Hook();
+
+		if (Settings::Enable) {
+			DebugAPIHook::Hook();
+
+			if (Settings::CursorDetected) {
+				CursorDetectedHook::Hook();
+			}
+
+			if (Settings::CursorCircle) {
+				CursorCircleHook::Hook();
+			}
+		}
 
 		break;
 	}

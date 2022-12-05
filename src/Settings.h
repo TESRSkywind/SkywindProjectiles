@@ -36,11 +36,19 @@ class Settings
 public:
 	static inline bool NormLightingsEnabled = true;
 
+	static inline bool Enable = true;
+	static inline bool CursorCircle = true;
+	static inline bool CursorDetected = true;
+
 	static void ReadSettings()
 	{
 		CSimpleIniA ini;
 		ini.LoadFile(ini_path.data());
 
 		ReadBool(ini, "General", "bNormLightningsEnabled", NormLightingsEnabled);
+
+		ReadBool(ini, "Debug", "bEnable", Enable);
+		ReadBool(ini, "Debug", "bCursorCircle", CursorCircle);
+		ReadBool(ini, "Debug", "bCursorDetected", CursorDetected);
 	}
 };
