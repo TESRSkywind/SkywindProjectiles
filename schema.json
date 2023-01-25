@@ -3,24 +3,145 @@
   "title": "MCM Config",
   "description": "Defines MCM Config layout",
   "type": "object",
-  "patternProperties": { "^[^\\\/:*?\"<>|']+.es[lmp]$": { "$ref": "#/$defs/ModConfig" } },
+  "patternProperties": {
+    "FormIDs": { "$ref": "#/$defs/FormIDsMap" },
+    "Emitters": {
+      "type": "object",
+      "patternProperties": { "^0x[0-9a-fA-F]{1,2}$|^(key_)":
+        { "$ref": "#/$defs/EmittersData" } },
+      "additionalProperties": false,
+      "description": "Configure emitter spells"
+    },
+    "^[^\\\/:*?\"<>|']+.es[lmp]$": { "$ref": "#/$defs/ModConfig" }
+  },
   "additionalProperties": false,
 
   "$defs": {
-    "editorID": {
+    "PluginFormID": {
+      "description": "PluginFormID",
       "type": "string",
-      "description": "Any comment. Ignored while parsing."
+      "$comment": "MyMod.esp|0x31415",
+      "pattern": "^[^\\\\\\/:*?\"<>|]+\\.es[lmp]\\|(0[Xx])[\\dA-Fa-f]{1,8}$"
     },
-    "pluginName": {
-      "description": "xEdit plugin name (e.g. \"FenixMod.esp\")",
+    "form_key": {
       "type": "string",
-      "pattern": "^[^\\\/:*?\"<>|']+.es[lmp]$"
+      "pattern": "^key_[\\w\\d]+"
+    },
+    "FormIDsMap": {
+      "type": "object",
+      "description": "A map string->formID for more convenience",
+      "patternProperties": {
+        "^key_[\\w\\d]+": {
+          "$ref": "#/$defs/FormOrID",
+          "description": "A form to which the key is mapped"
+        }
+      },
+      "additionalProperties": false
+    },
+
+
+
+    "point3": {
+      "type":"array",
+      "items": {
+        "type": "number"
+      },
+      "minItems": 3,
+      "maxItems": 3
+    },
+    "point2": {
+      "type":"array",
+      "items": {
+        "type": "number"
+      },
+      "minItems": 2,
+      "maxItems": 2
+    },
+
+
+
+    "FormOrKey": {
+      "oneOf": [
+        { "$ref": "#/$defs/PluginFormID" },
+        { "$ref": "#/$defs/form_key" }
+      ]
+    },
+    "FormOrID": {
+      "oneOf": [
+        { "$ref": "#/$defs/PluginFormID" },
+        { "$ref": "#/$defs/formID" }
+      ]
     },
     "formID": {
-      "description": "Form id of xedit record",
+      "description": "Form id of xEdit record",
       "type": "string",
       "pattern": "^0x[0-9a-fA-F]{1,8}$"
     },
+
+
+
+
+    "ifAutoAimConstSpeed": {
+      "$comment": "RotationTime for ConstSpeed type",
+      "if": {
+        "properties": {
+          "type": { "const": "ConstSpeed" }
+        },
+        "required": ["type"]
+      },
+      "then": {
+        "properties": {
+          "rotationTime": {
+            "type": "number",
+            "description": "Time needed to rotate at 180 deg (5, 3.5, 2.5 are nice)",
+            "minimum": 0.5,
+            "maximum": 100
+          }
+        },
+        "required": ["rotationTime"]
+      }
+    },
+    "ifAutoAimConstAccel": {
+      "$comment": "Acceleration for ConstAccel type",
+      "if": {
+        "properties": {
+          "type": { "const": "ConstAccel" }
+        },
+        "required": ["type"]
+      },
+      "then": {
+        "properties": {
+          "acceleration": {
+            "type": "integer",
+            "description": "Acceleration length (5, 10, 50 are nice)",
+            "minimum": 1,
+            "maximum": 300
+          }
+        },
+        "required": ["acceleration"]
+      }
+    },
+    "ifAutoAimCursor": {
+      "$comment": "Cursor radius for Cursor type",
+      "if": {
+        "properties": {
+          "target": { "const": "Cursor" }
+        },
+        "required": ["target"]
+      },
+      "then": {
+        "properties": {
+          "cursorAngle": {
+            "type": "integer",
+            "description": "Angle of cone for detecting targets near the cursor (5-15 are nice, 90 is max)",
+            "minimum": 0,
+            "maximum": 90
+          }
+        },
+        "required": ["cursorAngle"]
+      }
+    },
+
     "HomingTypes": {
       "description": "Type of homing trajectories",
       "enum": [ "ConstSpeed", "ConstAccel" ]
@@ -30,148 +151,200 @@
       "enum": [ "Both", "NPC", "Player" ]
     },
     "HomingTargets": {
-      "description": "How to capture target",
+      "description": "How to capture target (Default: Nearest)",
       "enum": [ "Cursor", "Nearest", "Hostile" ]
     },
-    "MultiCastShape": {
-      "description": "How to position projectiles",
-      "enum": [ "Single", "HorisontalLine", "VerticalLine", "Circle", "FillSquare", "Custom"  ]
-    },
-    "MultiCastRotation": {
-      "description": "How to rotate projectiles (default: Parallel)",
-      "enum": [ "Parallel", "ToSight" ]
-    },
-
     "Homing": {
+      "description": "Configure homing spells",
       "type": "object",
-      "patternProperties": { "^0x[0-9a-fA-F]{1,8}$": {
+      "patternProperties": { "^0x[0-9a-fA-F]{1,8}$|^(key_)": {
         "type": "object",
         "properties": {
-          "editorID": { "$ref": "#/$defs/editorID" },
           "type": { "$ref": "#/$defs/HomingTypes" },
-          "caster": { "$ref": "#/$defs/HomingCasters" },
-          "target": { "$ref": "#/$defs/HomingTargets" }
+          "target": { "$ref": "#/$defs/HomingTargets" },
+          "caster": { "$ref": "#/$defs/HomingCasters" }
         },
         "allOf": [
-          {
-            "$comment": "RotationTime for ConstSpeed type",
-            "if": {
-              "properties": {
-                "type": { "const": "ConstSpeed" }
-              }
-            },
-            "then": {
-              "properties": {
-                "rotationTime": {
-                  "type": "integer",
-                  "description": "Time needed to rotate at 180 deg, multiplied by 100 (500, 350, 250 are nice)"
-                }
-              },
-              "required": ["rotationTime"]
-            }
-          },
-          {
-            "$comment": "Acceleration for ConstAccel type",
-            "if": {
-              "properties": {
-                "type": { "const": "ConstAccel" }
-              }
-            },
-            "then": {
-              "properties": {
-                "acceleration": {
-                  "type": "integer",
-                  "description": "Acceleration length, multiplied by 10 (50, 100, 500 are nice)"
-                }
-              },
-              "required": ["acceleration"]
-            }
-          },
-          {
-            "$comment": "Acceleration for ConstAccel type",
-            "if": {
-              "properties": {
-                "target": { "const": "Cursor" }
-              }
-            },
-            "then": {
-              "properties": {
-                "cursorAngle": {
-                  "type": "integer",
-                  "description": "Angle of cone for detecting targets near the cursor (5-15 are nice)"
-                }
-              },
-              "required": ["cursorAngle"]
-            }
-          }
+          { "$ref": "#/$defs/ifAutoAimConstSpeed" },
+          { "$ref": "#/$defs/ifAutoAimConstAccel" },
+          { "$ref": "#/$defs/ifAutoAimCursor" }
         ],
-        
-        "required": [ "type", "target" ],
+      
+        "required": [ "type" ],
         "unevaluatedProperties": false
       } },
       
-      "additionalProperties": false,
-      "description": "Configure homing spells"
+      "additionalProperties": false
     },
 
+
+
+
+    "SpellID": {
+      "oneOf": [ { "$ref": "#/$defs/FormOrKey" }, { "const": "Current" } ], "description": "A spell to cast"
+    },
+    "MultiCastShape": {
+      "description": "How to position projectiles (default: Single)",
+      "enum": [ "Single", "HorizontalLine", "VerticalLine", "Circle", "HalfCircle", "FillSquare" ]
+    },
+    "MultiCastRotation": {
+      "description": "How to rotate projectiles (default: Parallel)",
+      "enum": [ "Parallel", "ToSight", "ToCenter", "FromCenter" ]
+    },
+    "MultiCastSound": {
+      "description": "How many times play sound for a group (default: Every)",
+      "enum": [ "Single", "Every", "None" ]
+    },
+    "Count": {
+      "description": "Number of projectiles to spawn",
+      "type": "integer",
+      "minimum": 1
+    },
+    "NewProjType": {
+      "type": "object",
+      "description": "Should new projectile be new type (homing, emitter etc)",
+      "properties": {
+        "Emitter": { "$ref": "#/$defs/FormOrKey", "description": "Set th projectile to emitter with this key" },
+        "Homing": { "$ref": "#/$defs/FormOrKey", "description": "Set th projectile to homing with this key" }
+      },
+      "additionalProperties": false
+    },
+    "MulticastData": {
+      "type": "object",
+      "description": "Multicast data. Key is 8-digit hex number. Used while searching by bproj.formID or just key",
+      "properties": {
+        "shape": { "$ref": "#/$defs/MultiCastShape" },
+        "rotation": { "$ref": "#/$defs/MultiCastRotation" },
+        "spellID": { "$ref": "#/$defs/SpellID" },
+        "sound": { "$ref": "#/$defs/MultiCastSound" },
+        "count": { "$ref": "#/$defs/Count" },
+        "NewProjType": { "$ref": "#/$defs/NewProjType" },
+        "spawnData": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "description": "Spawn group data",
+            "properties": {
+              "rotRnd": { "$ref": "#/$defs/point2", "description": "Max delta for random angles" },
+              "rotDelta": { "$ref": "#/$defs/point2", "description": "Delta for angles" },
+              "pos": { "$ref": "#/$defs/point3", "description": "Origin center" },
+              "posRnd": { "$ref": "#/$defs/point3", "description": "Max delta for random origin" },
+              "spellID": { "$ref": "#/$defs/SpellID" },
+              "rotation": { "$ref": "#/$defs/MultiCastRotation" },
+              "sound": { "$ref": "#/$defs/MultiCastSound" },
+              "shape": { "$ref": "#/$defs/MultiCastShape" },
+              "NewProjType": { "$ref": "#/$defs/NewProjType" },
+              "count": { "$ref": "#/$defs/Count" },
+              "normal": { "$ref": "#/$defs/point3", "description": "Normal of the spawning plane" },
+              "size": {
+                "type": "integer",
+                "description": "Shape size (usually 50--200). If shape is not Single, MUST present",
+                "minimum": 1
+              }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "normal": true
+                  },
+                  "required": [ "normal" ]
+                },
+                "then": {
+                  "properties": {
+                    "xDepends": {
+                      "type": "boolean",
+                      "description": "Is normal depends only on left-right or on up-down too"
+                    }
+                  }
+                }
+              }
+            ],
+            "unevaluatedProperties": false
+          }
+        }
+      },
+      "required": [ "spawnData" ],
+      "unevaluatedProperties": false
+      
+    },
     "Multicast": {
       "type": "object",
-      "patternProperties": { "^0x[0-9a-fA-F]{1,8}$": {
-        "type": "object",
-        "properties": {
-          "editorID": { "$ref": "#/$defs/editorID" },
-          "shape": { "$ref": "#/$defs/MultiCastShape" }
-        },
-        "required": [ "shape" ],
-        "unevaluatedProperties": false,
-        "allOf": [
-          {
-            "$comment": "Custom shape, additional data for each projectile (group)",
-            "if": {
-              "properties": {
-                "shape": { "const": "Custom" }
-              }
-            },
-            "then": {
-
-            }
-          },
-          {
-            "$comment": "Regular shape, only type and size needed",
-            "if": {
-              "properties": {
-                "shape": { "enum": [ "HorisontalLine", "VerticalLine", "Circle", "FillSquare" ] }
-              }
-            },
-            "then": {
-              "properties": {
-                "size": {
-                  "type": "integer",
-                  "description": "Shape size (usually 50--200)"
-                },
-                "count": {
-                  "type": "integer",
-                  "description": "Number of projectiles to spawn (usually 50--200)",
-                  "minimum": 1
-                },
-                "rotation": { "$ref": "#/$defs/MultiCastRotation" }
-              },
-              "required": [ "size", "count" ]
-            }
-          }
-        ]
-      } },
-      
+      "patternProperties": { "^0x[0-9a-fA-F]{1,8}$|^(key_)": { "$ref": "#/$defs/MulticastData" } },
       "additionalProperties": false,
       "description": "Configure multicast spells"
     },
+
+
+
+    "ifEmittersMulticastType": {
+      "$comment": "Key for Multicast emitter",
+      "if": {
+        "properties": {
+          "type": { "const": "Multicast" }
+        },
+        "required": ["type"]
+      },
+      "then": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "pattern": "^0x[0-9a-fA-F]{1,8}$|^(key_)",
+            "description": "ID of the function to call"
+          }
+        },
+        "required": ["key"]
+      }
+    },
+    "EmittersData": {
+      "type": "object",
+      "description": "Emitters data. Used while searching by bproj.formID or just key",
+      "properties": {
+        "interval": {
+          "type": "number",
+          "description": "Event fires every this time (sec)",
+          "minimum": 0.1,
+          "maximum": 20
+        },
+        "type": {
+          "enum": [ "Multicast" ]
+        }
+      },
+      "allOf": [
+        { "$ref": "#/$defs/ifEmittersMulticastType" }
+      ],
+      "required": [ "type", "interval", "key" ],
+      "unevaluatedProperties": false
+    },
+    "Emitters": {
+      "type": "object",
+      "patternProperties": { "^0x[0-9a-fA-F]{1,8}$|^(key_)": {
+        "type": "object",
+        "properties": { "key": {
+          "type": "string",
+          "pattern": "^0x[a-fA-F0-9]{1,2}$",
+          "description": "A key for global map"
+        } },
+        "required": ["key"],
+        "additionalProperties": false,
+        "description": "Set emitter type for this projectile"
+      } },
+      "additionalProperties": false,
+      "description": "Configure emitter spells"
+    },
+
+
+
+
 
     "ModConfig": {
       "type": "object",
       "description": "Configure projectiles in the mod",
       "properties": {
         "Homing": { "$ref": "#/$defs/Homing" },
-        "Multicast": { "$ref": "#/$defs/Multicast" }
+        "Multicast": { "$ref": "#/$defs/Multicast" },
+        "Emitters": { "$ref": "#/$defs/Emitters" }
       },
       "additionalProperties": false
     }

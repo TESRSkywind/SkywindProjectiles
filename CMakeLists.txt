@@ -90,7 +90,19 @@ set(SOURCES
 	src/FenixProjectilesAPI.h
 	src/Settings.h
 	src/PCH.h
+	src/AutoAim.h
+	src/AutoAim.cpp
+	src/Multicast.h
+	src/Multicast.cpp
+	src/Emittors.h
+	src/Emittors.cpp
+	src/RuntimeData.h
+	src/RuntimeData.cpp
+	src/JsonUtils.h
+	src/JsonUtils.cpp
+	src/Settings.h
 	CMakePresets.json
+	src/CustomFloats.h
 	schema.json
 )
 
@@ -205,11 +217,4 @@ target_precompile_headers(
 add_custom_command(
 	TARGET ${PROJECT_NAME} POST_BUILD
 	COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:${PROJECT_NAME}> "e:/MO2_Data/mods/FenixProjectilesAPI/skse/plugins/"
-)
-
-add_custom_command(
-	TARGET ${PROJECT_NAME} POST_BUILD
-	COMMAND ${CMAKE_COMMAND} -E copy
-		${CMAKE_CURRENT_SOURCE_DIR}/HomieSpells.json
-		e:/MO2_Data/mods/FenixProjectilesAPI/HomingProjectiles/HomieSpells.json
 )

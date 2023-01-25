@@ -47,12 +47,51 @@ extern "C" DLLEXPORT bool SKSEAPI SKSEPlugin_Query(const SKSE::QueryInterface* a
 
 #include "Hooks.h"
 #include "Settings.h"
+#include "AutoAim.h"
+#include "Multicast.h"
+#include "Emittors.h"
+
+class InputHandler : public RE::BSTEventSink<RE::InputEvent*>
+{
+public:
+	static InputHandler* GetSingleton()
+	{
+		static InputHandler singleton;
+		return std::addressof(singleton);
+	}
+
+	RE::BSEventNotifyControl ProcessEvent(RE::InputEvent* const* e,
+		RE::BSTEventSource<RE::InputEvent*>*) override
+	{
+		if (!*e)
+			return RE::BSEventNotifyControl::kContinue;
+
+		if (auto buttonEvent = (*e)->AsButtonEvent();
+			buttonEvent && buttonEvent->HasIDCode() &&
+			(buttonEvent->IsDown() || buttonEvent->IsPressed())) {
+			if (int key = buttonEvent->GetIDCode(); key == 71) {
+				reset_json();
+				Settings::ReadSettings();
+			}
+		}
+		return RE::BSEventNotifyControl::kContinue;
+	}
+
+	void enable() {
+		if (auto input = RE::BSInputDeviceManager::GetSingleton()) {
+			input->AddEventSink(this);
+		}
+	}
+};
 
 static void SKSEMessageHandler(SKSE::MessagingInterface::Message* message)
 {
 	switch (message->type) {
 	case SKSE::MessagingInterface::kDataLoaded:
 		Settings::ReadSettings();
+		read_json();
+
+		InputHandler::GetSingleton()->enable();
 
 		PaddingsProjectileHook::Hook();
 		InitStartPosHook::Hook();
@@ -61,23 +100,14 @@ static void SKSEMessageHandler(SKSE::MessagingInterface::Message* message)
 		if (Settings::NormLightingsEnabled)
 			NormLightingsHook::Hook();
 
-		AutoAimHook::Hook();
-
-		read_json();
 		SetNewTypeHook::Hook();
 
-		ManyProjsHook::Hook();
+		AutoAim::install();
+		ManyProjs::install();
+		Emitters::install();
 
 		if (Settings::Enable) {
 			DebugAPIHook::Hook();
-
-			if (Settings::CursorDetected) {
-				CursorDetectedHook::Hook();
-			}
-
-			if (Settings::CursorCircle) {
-				CursorCircleHook::Hook();
-			}
 		}
 
 		break;

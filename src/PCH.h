@@ -1,6 +1,6 @@
 #pragma once
 
-//#define DEBUG
+#define DEBUG
 
 #include "RE/Skyrim.h"
 #include "SKSE/SKSE.h"
@@ -21,3 +21,4 @@ namespace logger = SKSE::log;
 
 #include "Version.h"
 #include "UselessFenixUtils.h"
+#include "magic_enum.hpp"
