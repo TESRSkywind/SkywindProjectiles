@@ -9,7 +9,7 @@ namespace ManyProjs
 	enum class Shape : uint32_t
 	{
 		Single,
-		HorisontalLine,
+		HorizontalLine,
 		VerticalLine,
 		Circle,
 		HalfCircle,
@@ -61,27 +61,30 @@ namespace ManyProjs
 			};
 			static_assert(sizeof(BitData) == 0x4);
 
-			// A part of JsonDataItem, contains keys of new types
-			struct NewProjType
+			struct SpellData
 			{
-				uint32_t emitter;
-				uint32_t homing;
+				uint32_t spellID;
 			};
-			static_assert(sizeof(NewProjType) == 0x8);
+
+			struct ArrowData
+			{
+				uint32_t weapID; // -- default. -1 = Current
+				uint32_t arrowID; // -- default. 0 = unset, -1 = Current
+			};
 
 			// Stored in Json, queried only at creation
 			struct JsonDataItem
 			{
-				ProjectileRot rot_rnd;    // 00
-				ProjectileRot rot_delta;  // 08 -- rot Parallel
-				RE::NiPoint3 pos;         // 10
-				RE::NiPoint3 pos_rnd;     // 1C
-				RE::NiPoint3 normal;      // 28
-				uint32_t spellID;         // 34 -- default. 0 = unset, -1 = Current
-				BitData bitdata;          // 38
-				NewProjType newtypes;     // 3C
+				ProjectileRot rot_rnd;                    // 00
+				ProjectileRot rot_delta;                  // 08 -- rot Parallel
+				RE::NiPoint3 pos;                         // 10
+				RE::NiPoint3 pos_rnd;                     // 1C
+				RE::NiPoint3 normal;                      // 28
+				BitData bitdata;                          // 34
+				std::variant<SpellData, ArrowData> data;  // 38
+				NewProjType newtypes;                     // 44
 			};
-			static_assert(sizeof(JsonDataItem) == 0x44);
+			static_assert(sizeof(JsonDataItem) == 0x4C);
 
 		private:
 			struct MapEntry
@@ -89,7 +92,7 @@ namespace ManyProjs
 				std::vector<JsonDataItem> spawnData;
 				JsonDataItem def;
 			};
-			static_assert(sizeof(MapEntry) == 0x68);
+			static_assert(sizeof(MapEntry) == 0x70);
 
 			using Map_t = std::unordered_map<uint32_t, MapEntry>;
 
@@ -105,29 +108,34 @@ namespace ManyProjs
 
 				if (item.isMember("spellID")) {
 					auto spellID = item["spellID"].asString();
+					data.data = SpellData{};
+					auto& spelldata = std::get<SpellData>(data.data);
 					if (spellID == "Current")
-						data.spellID = (uint32_t)-1;
+						spelldata.spellID = (uint32_t)-1;
 					else
-						data.spellID = JsonUtils::get_formid(spellID);
+						spelldata.spellID = JsonUtils::get_formid(spellID);
+				} else if (item.isMember("weapID")) {
+					data.data = ArrowData{};
+					auto& arrowdata = std::get<ArrowData>(data.data);
+
+					auto weapID = item["weapID"].asString();
+					if (weapID == "Current")
+						arrowdata.weapID = (uint32_t)-1;
+					else
+						arrowdata.weapID = JsonUtils::get_formid(weapID);
+
+					if (item.isMember("arrowID")) {
+						auto arrowID = item["arrowID"].asString();
+						if (arrowID == "Current")
+							arrowdata.arrowID = (uint32_t)-1;
+						else
+							arrowdata.arrowID = JsonUtils::get_formid(arrowID);
+					}
 				} else {
-					data.spellID = 0;
+					data.data = SpellData{};
 				}
 
-				if (item.isMember("NewProjType")) {
-					auto& NewProjType = item["NewProjType"];
-
-					auto read_field = [&NewProjType](std::string_view field_name) {
-						return NewProjType.isMember(field_name.data()) ?
-						           JsonUtils::get_formid(
-									   NewProjType[field_name.data()].asString()) :
-						           0;
-					};
-
-					data.newtypes.emitter = read_field("Emitter"sv);
-					data.newtypes.homing = read_field("Homing"sv);
-				} else {
-					data.newtypes = {};
-				}
+				data.newtypes.init(item);
 			}
 
 			// init both default & normal entries
@@ -365,8 +373,18 @@ namespace ManyProjs
 			new_rot = Rotation::add_rot(new_rot, data.rot_delta);
 			new_rot = Rotation::add_rot_rnd(new_rot, data.rot_rnd);
 
-			return cast_CustomPos(cast_data.caster, cast_data.spel, pos, new_rot,
-				withSound);
+			auto type = cast_data.data.index();
+			if (type == 0) {
+				// SpellData
+				return cast_CustomPos(cast_data.caster,
+					std::get<CastData::SpellData>(cast_data.data).spel, pos, new_rot,
+					withSound);
+			} else {
+				// ArrowData
+				auto& arrow_data = std::get<CastData::ArrowData>(cast_data.data);
+				return cast_CustomPos(cast_data.caster, arrow_data.ammo, arrow_data.weap,
+					pos, new_rot);
+			}
 		}
 
 		static const std::array<std::function<std::vector<RE::NiPoint3>(
@@ -380,7 +398,7 @@ namespace ManyProjs
 					return std::vector<RE::NiPoint3>(shape_params.count, plane.startPos);
 				},
 
-				// HorisontalLine
+				// HorizontalLine
 				[](ShapeParams shape_params,
 					const Plane& plane) -> std::vector<RE::NiPoint3> {
 					if (shape_params.count == 1) {
@@ -403,7 +421,7 @@ namespace ManyProjs
 					const Plane& plane) -> std::vector<RE::NiPoint3> {
 					Plane new_plane = plane;
 					std::swap(new_plane.right_dir, new_plane.up_dir);
-					return MultiCasters[(size_t)Shape::HorisontalLine](shape_params,
+					return MultiCasters[(size_t)Shape::HorizontalLine](shape_params,
 						new_plane);
 				},
 
@@ -450,7 +468,7 @@ namespace ManyProjs
 					uint32_t h = (uint32_t)ceil(sqrt(shape_params.count));
 
 					if (h == 1) {
-						return MultiCasters[(size_t)Shape::HorisontalLine](shape_params,
+						return MultiCasters[(size_t)Shape::HorizontalLine](shape_params,
 							plane);
 					}
 
@@ -463,7 +481,7 @@ namespace ManyProjs
 					std::vector<RE::NiPoint3> ans;
 					while (shape_params.count >= h) {
 						cur_plane.startPos = from;
-						auto cur_line = MultiCasters[(uint32_t)Shape::HorisontalLine](
+						auto cur_line = MultiCasters[(uint32_t)Shape::HorizontalLine](
 							params, cur_plane);
 						ans.insert(ans.end(), cur_line.begin(), cur_line.end());
 						from -= plane.up_dir * d;
@@ -473,7 +491,7 @@ namespace ManyProjs
 					if (shape_params.count > 0) {
 						cur_plane.startPos = from;
 						params.count = shape_params.count;
-						auto cur_line = MultiCasters[(uint32_t)Shape::HorisontalLine](
+						auto cur_line = MultiCasters[(uint32_t)Shape::HorizontalLine](
 							params, cur_plane);
 						ans.insert(ans.end(), cur_line.begin(), cur_line.end());
 					}
@@ -487,13 +505,55 @@ namespace ManyProjs
 				}
 			};
 
+		using SpellArrowData = std::variant<Data::JsonStorage::SpellData, Data::JsonStorage::ArrowData>;
+		auto read_default(const SpellArrowData& data, const SpellArrowData& data_def) {
+			auto data_ind = data.index();
+
+			if (data_ind == 1) {
+				// ArrowData
+				return data;
+			}
+
+			if (data_ind == 0 && std::get<0>(data).spellID != 0) {
+				// SpellData, not empty
+				return data;
+			}
+
+			return data_def;
+		}
+
 		void multiCastGroup(const Data::JsonStorage::JsonDataItem& data,
 			const Data::JsonStorage::JsonDataItem& data_def, CastData& cast_data)
 		{
-			auto spell_id =
-				read_default<(uint32_t)0, (uint32_t)0>(data.spellID, data_def.spellID);
-			if (spell_id != 0 && spell_id != (uint32_t)-1) {
-				cast_data.spel = RE::TESForm::LookupByID<RE::SpellItem>(spell_id);
+			auto spellarrow_data = read_default(data.data, data_def.data);
+
+			auto type = spellarrow_data.index();
+			if (type == 0) {
+				auto& spell_data = std::get<Data::JsonStorage::SpellData>(spellarrow_data);
+
+				auto spell_id = spell_data.spellID;
+
+				if (cast_data.data.index() != 0)
+					cast_data.data = CastData::SpellData{};
+				if (spell_id != 0 && spell_id != (uint32_t)-1) {
+					std::get<CastData::SpellData>(cast_data.data).spel = RE::TESForm::LookupByID<RE::SpellItem>(spell_id);
+				}
+			} else {
+				auto& arrow_data = std::get<Data::JsonStorage::ArrowData>(spellarrow_data);
+
+				auto arrow_id = arrow_data.arrowID;
+				auto weap_id = arrow_data.weapID;
+
+				if (cast_data.data.index() != 1)
+					cast_data.data = CastData::ArrowData{};
+				auto& arrowdata = std::get<CastData::ArrowData>(cast_data.data);
+				
+				if (weap_id != 0 && weap_id != (uint32_t)-1) {
+					arrowdata.weap = RE::TESForm::LookupByID<RE::TESObjectWEAP>(weap_id);
+				}
+				if (arrow_id != 0 && arrow_id != (uint32_t)-1) {
+					arrowdata.ammo = RE::TESForm::LookupByID<RE::TESAmmo>(arrow_id);
+				}
 			}
 
 			uint32_t count = read_default<(uint32_t)0, (uint32_t)1>(data.bitdata.count,
@@ -551,8 +611,10 @@ namespace ManyProjs
 				return new_rot;
 			};
 
-			if (needsound == SoundType::Single)
-				Sounds::play_cast_sound(cast_data.caster, cast_data.spel, spawn_center);
+			// SpellData
+			if (type == 0 && needsound == SoundType::Single)
+				Sounds::play_cast_sound(cast_data.caster,
+					std::get<CastData::SpellData>(cast_data.data).spel, spawn_center);
 			
 			uint32_t key_emitter = read_default<(uint32_t)0, (uint32_t)0>(
 				data.newtypes.emitter, data_def.newtypes.emitter);
@@ -587,13 +649,25 @@ namespace ManyProjs
 			}
 		}
 
+		auto get_ManyCasted(uint32_t key)
+		{
+			auto found = Data::JsonStorage::map.find(key);
+			return std::make_pair(found != Data::JsonStorage::map.end(), found);
+		}
+
+		bool is_ManyCasted(uint32_t key)
+		{
+			auto found = Data::JsonStorage::map.find(key);
+			return found != Data::JsonStorage::map.end();
+		}
+
 		void onManyCasted(uint32_t key, CastData& cast_data)
 		{
-			auto it = Data::JsonStorage::map.find(key);
-			if (it == Data::JsonStorage::map.end())
+			auto found = get_ManyCasted(key);
+			if (!found.first)
 				return;
 
-			auto& data = (*it).second;
+			auto& data = (*found.second).second;
 
 			if (data.spawnData.empty()) {
 				// TODO
@@ -601,27 +675,70 @@ namespace ManyProjs
 			}
 
 			for (const auto& spawn_data : data.spawnData) {
+				auto spellarrow_data = read_default(spawn_data.data, data.def.data);
+				auto spawn_ind = spellarrow_data.index();
+				
+				auto data_ind = cast_data.data.index();
+				if (data_ind != spawn_ind) {
+					if (spawn_ind == 0)
+						cast_data.data = CastData::SpellData{};
+					else
+						cast_data.data = CastData::ArrowData{};
+				}
+
+				if (spawn_ind == 0) {
+					auto& spell_data = std::get<Data::JsonStorage::SpellData>(spellarrow_data);
+					// init current spell
+					auto& spelldata = std::get<CastData::SpellData>(cast_data.data);
+
+					if (spell_data.spellID && spell_data.spellID != (uint32_t)-1) {
+						spelldata.spel = RE::TESForm::LookupByID<RE::SpellItem>(spell_data.spellID);
+					}
+				}
+				if (spawn_ind == 1) {
+					auto& arrow_data = std::get<Data::JsonStorage::ArrowData>(spellarrow_data);
+					// init current ammo & weapon
+					auto& arrowdata = std::get<CastData::ArrowData>(cast_data.data);
+
+					if (arrow_data.arrowID != 0 && arrow_data.arrowID != (uint32_t)-1)
+						arrowdata.ammo = RE::TESForm::LookupByID<RE::TESAmmo>(arrow_data.arrowID);
+
+					if (arrow_data.weapID && arrow_data.weapID != (uint32_t)-1)
+						arrowdata.weap = RE::TESForm::LookupByID<RE::TESObjectWEAP>(arrow_data.weapID);
+				}
+
 				multiCastGroup(spawn_data, data.def, cast_data);
 			}
 		}
 
-		// Perform multicast with key=spell.proj.formid
+		// Perform multicast with key=(spell or ammo).proj.formid
 		void onManyCasted(CastData& cast_data)
 		{
-			auto mgef = FenixUtils::getAVEffectSetting(cast_data.spel);
-			if (!mgef)
-				return;
+			auto ind = cast_data.data.index();
+			if (ind == 0) {
+				// SpellData
+				auto mgef = FenixUtils::getAVEffectSetting(
+					std::get<CastData::SpellData>(cast_data.data).spel);
+				if (!mgef)
+					return;
 
-			auto bproj = mgef->data.projectileBase;
-			if (!bproj)
-				return;
+				auto bproj = mgef->data.projectileBase;
+				if (!bproj)
+					return;
 
-			auto formID = bproj->formID;
+				auto formID = bproj->formID;
 
-			return onManyCasted(formID, cast_data);
+				return onManyCasted(formID, cast_data);
+			}
+
+			if (ind == 1) {
+				return onManyCasted(std::get<CastData::ArrowData>(cast_data.data)
+										.ammo->data.projectile->formID,
+					cast_data);
+			}
 		}
 
-		// Used for hook. Perform multicast with spell = magic_caster's current spell.
+		// Used for magic hook. Perform multicast with spell = magic_caster's current spell.
 		void onManyCasted(RE::MagicCaster* magic_caster, RE::Actor* caster,
 			RE::NiPoint3* startPos, ProjectileRot parallel_rot)
 		{
@@ -632,10 +749,18 @@ namespace ManyProjs
 			if (!spel)
 				return;
 
-			CastData cast_data = { caster, parallel_rot, spel, startPos };
+			CastData cast_data = { caster, parallel_rot, startPos, CastData::SpellData{ spel } };
 			return onManyCasted(cast_data);
 		}
 
+		// Used for arrow hook. Perform multicast with arrow = actor's currect 
+		void onManyCasted(RE::Actor* shooter, RE::NiPoint3* startPos,
+			ProjectileRot parallel_rot, RE::TESObjectWEAP* weap, RE::TESAmmo* ammo)
+		{
+			CastData cast_data = { shooter, parallel_rot, startPos,
+				CastData::ArrowData{ weap, ammo } };
+			return onManyCasted(cast_data);
+		}
 	}
 
 	namespace Hooks
@@ -646,20 +771,17 @@ namespace ManyProjs
 		public:
 			static void Hook()
 			{
-				_castProjectile =
-					SKSE::GetTrampoline().write_call<5>(REL::ID(33670).address() + 0x575,
-						castProjectile);  // SkyrimSE.exe+5504F5
+				_castProjectile = SKSE::GetTrampoline().write_call<5>(REL::ID(33670).address() + 0x575,
+					castProjectile);  // SkyrimSE.exe+5504F5
 			}
 
 		private:
-			static bool castProjectile(RE::MagicCaster* a, RE::BGSProjectile* bproj,
-				RE::Actor* a_char, RE::CombatController* a4, RE::NiPoint3* startPos,
-				float rotationZ, float rotationX, uint32_t area, void* a9)
+			static bool castProjectile(RE::MagicCaster* a, RE::BGSProjectile* bproj, RE::Actor* a_char, RE::CombatController* a4,
+				RE::NiPoint3* startPos, float rotationZ, float rotationX, uint32_t area, void* a9)
 			{
-				if (Data::JsonStorage::map.find(bproj->formID) ==
-					Data::JsonStorage::map.end())
-					return _castProjectile(a, bproj, a_char, a4, startPos, rotationZ,
-						rotationX, area, a9);
+				auto found = Casting::get_ManyCasted(bproj->formID);
+				if (!found.first)
+					return _castProjectile(a, bproj, a_char, a4, startPos, rotationZ, rotationX, area, a9);
 
 				Casting::onManyCasted(a, a_char, startPos, { rotationX, rotationZ });
 
@@ -668,14 +790,80 @@ namespace ManyProjs
 
 			static inline REL::Relocation<decltype(castProjectile)> _castProjectile;
 		};
+
+		struct Projectile__LaunchData
+		{
+			void* vftable_LaunchData_0;
+			RE::NiPoint3 startPos;
+			RE::NiPoint3 Point_14;
+			RE::BGSProjectile* projectile;
+			RE::TESObjectREFR* source;
+			RE::CombatController* combatController;
+			RE::TESObjectWEAP* weap;
+			RE::TESAmmo* overwriteAmmo;
+			float rotationZ;
+			float rotationX;
+			void* field_50;
+			RE::TESObjectREFR* target;
+			std::pair<float, float> drawn_time;
+			RE::TESObjectCELL* cell;
+			RE::MagicItem* CastItem;
+			RE::MagicSystem::CastingSource castingSource;
+			RE::EnchantmentItem* ammoEnchantment;
+			RE::AlchemyItem* poison;
+			uint32_t area;
+			float Effectiveness;
+			float scale;
+			char field_9C;
+			char field_9D;
+			char field_9E;
+			char field_9F;
+			char field_A0;
+			char field_A1;
+			char field_A2;
+			char field_A3;
+			char gapA4[4];
+		};
+
+		// Spawn many arrows
+		class SetNewTypeHook
+		{
+		public:
+			static void Hook()
+			{
+				FenixUtils::writebytes<17693, 0xefa>("\x0F\x1F\x80\x00\x00\x00\x00"sv);
+
+				_CreateProjectile = SKSE::GetTrampoline().write_call<5>(REL::ID(17693).address() + 0xe82,
+					CreateProjectile);  // SkyrimSE.exe+2360C2 -- TESObjectWEAP::Fire_140235240
+			}
+
+		private:
+			static uint32_t* CreateProjectile(uint32_t* handle, Projectile__LaunchData* ldata)
+			{
+				auto bproj = ldata->projectile;
+
+				auto found = Casting::get_ManyCasted(bproj->formID);
+				if (!found.first)
+					return _CreateProjectile(handle, ldata);
+
+				Casting::onManyCasted(ldata->source->As<RE::Actor>(), &ldata->startPos,
+					ProjectileRot{ ldata->rotationX, ldata->rotationZ }, ldata->weap, ldata->overwriteAmmo);
+
+				*handle = 0;
+
+				return handle;
+			}
+
+			static inline REL::Relocation<decltype(CreateProjectile)> _CreateProjectile;
+		};
 	}
 
 	void forget() { Data::JsonStorage::clear(); }
 
-	void add_mod(const Json::Value& multicast, int hex)
-	{
-		Data::JsonStorage::init(multicast, hex);
-	}
+	void add_mod(const Json::Value& multicast, int hex) { Data::JsonStorage::init(multicast, hex); }
 
-	void install() { Hooks::ManyProjsHook::Hook(); }
+	void install() {
+		Hooks::ManyProjsHook::Hook();
+		Hooks::SetNewTypeHook::Hook();
+	}
 }

@@ -10,4 +10,4 @@ bool is_CustomPosType(RE::Projectile* proj)
 	return get_runtime_data(proj).isCustomPos();
 }
 void set_CustomPosType(RE::Projectile* proj) { get_runtime_data(proj).setCustomPos(); }
-void set_NormalType(RE::Projectile* proj) { get_runtime_data(proj).set_NormalType(); }
+void init_NormalType(RE::Projectile* proj) { get_runtime_data(proj).set_NormalType(); }

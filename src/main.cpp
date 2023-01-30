@@ -96,6 +96,7 @@ static void SKSEMessageHandler(SKSE::MessagingInterface::Message* message)
 		PaddingsProjectileHook::Hook();
 		InitStartPosHook::Hook();
 		MultipleBeamsHook::Hook();
+		MultipleFlamesHook::Hook();
 
 		if (Settings::NormLightingsEnabled)
 			NormLightingsHook::Hook();
@@ -113,6 +114,60 @@ static void SKSEMessageHandler(SKSE::MessagingInterface::Message* message)
 		break;
 	}
 }
+
+/*
+	using VM = RE::BSScript::Internal::VirtualMachine;
+	using StackID = RE::VMStackID;
+
+	float get_tresh_pap(VM*, StackID, RE::ActorValueInfo*, uint32_t) { return get_tresh(); }
+
+	bool RegisterFuncs(RE::BSScript::IVirtualMachine* a_vm)
+	{
+		
+		a_vm->RegisterFunction("ActorValueInfo", "GetExperienceForLevel", get_tresh_pap);
+
+		return true;
+	}
+
+float get_tresh() { return 50.0f; }
+
+// Change LVL formula 1
+class CustomLVLHook
+{
+public:
+	static void Hook()
+	{
+		// SkyrimSE.exe+6E69B5
+		uintptr_t ret_addr = REL::ID(40565).address() + 0x15;
+
+		struct Code : Xbyak::CodeGenerator
+		{
+			Code(uintptr_t func_addr, uintptr_t ret_addr)
+			{
+				push(rcx);
+				push(rcx);
+
+				mov(rax, func_addr);
+				call(rax);
+
+				pop(rcx);
+				pop(rcx);
+
+				mov(rax, ret_addr);
+				jmp(rax);
+			}
+		} xbyakCode{ uintptr_t(get_tresh), ret_addr };
+
+		FenixUtils::add_trampoline<5, 40565, 0xd>(&xbyakCode);  // SkyrimSE.exe+6E69AD
+
+		FenixUtils::writebytes<40565, 0x18>("\x90\x90\x90\x90\x90\x90\x90\x90");
+		FenixUtils::writebytes<40565, 0xd + 0x5>("\x90\x90\x90");
+	}
+
+private:
+	static float get_lvl_tresh() { return get_tresh(); }
+};
+*/
 
 extern "C" DLLEXPORT bool SKSEAPI SKSEPlugin_Load(const SKSE::LoadInterface* a_skse)
 {

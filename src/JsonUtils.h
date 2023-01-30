@@ -1,7 +1,6 @@
 #pragma once
 
 #include "FenixProjectilesAPI.h"
-#include "json/json.h"
 
 template <typename T, T def>
 T parse_impl(const std::string& s)
@@ -61,6 +60,10 @@ namespace JsonUtils
 		}
 
 		// `key` must present and starts with "key_"
-		static auto get(std::string key) { return (*formIDs.find(key)).second; }
+		static auto get(std::string key)
+		{
+			auto found = formIDs.find(key);
+			return found == formIDs.end() ? 0 : (*found).second;
+		}
 	};
 }

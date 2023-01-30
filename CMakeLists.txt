@@ -88,6 +88,7 @@ set(SOURCES
 	src/NewProjectiles.h
 	src/NewProjectiles.cpp
 	src/FenixProjectilesAPI.h
+	src/FenixProjectilesAPI.cpp
 	src/Settings.h
 	src/PCH.h
 	src/AutoAim.h
@@ -101,9 +102,9 @@ set(SOURCES
 	src/JsonUtils.h
 	src/JsonUtils.cpp
 	src/Settings.h
-	CMakePresets.json
 	src/CustomFloats.h
 	schema.json
+	CMakePresets.json
 )
 
 source_group(

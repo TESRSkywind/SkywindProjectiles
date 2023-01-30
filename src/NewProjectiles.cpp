@@ -67,7 +67,7 @@ namespace Impl
 		RE::EnchantmentItem* ammoEnchantment;
 		RE::AlchemyItem* poison;
 		uint32_t area;
-		float field_94;
+		float Effectiveness;
 		float scale;
 		char field_9C;
 		char field_9D;
@@ -107,7 +107,39 @@ namespace Impl
 		ldata.ammoEnchantment = nullptr;
 		ldata.poison = nullptr;
 		ldata.area = area;
-		ldata.field_94 = 1.0f;
+		ldata.Effectiveness = 1.0f;
+		ldata.scale = 1.0f;
+		*(uint32_t*)&ldata.field_9C = 0x10000;
+		ldata.field_A0 = 0;
+		ldata.field_A1 = 0;
+		ldata.field_A2 = 0;
+	}
+
+	void init_Launchdata(Projectile__LaunchData& ldata, RE::Actor* a,
+		const RE::NiPoint3& startPos, float rotationZ, float rotationX, RE::TESAmmo* ammo,
+		RE::TESObjectWEAP* weap)
+	{
+		ldata.vftable_LaunchData_0 = nullptr;  // TODO: mb used
+		ldata.startPos = startPos;
+		ldata.Point_14 = { 0.0f, 0.0f, 0.0f };
+		ldata.projectile = ammo->data.projectile;
+		ldata.source = a;
+		ldata.combatController = a->combatController;
+		ldata.weap = weap;
+		ldata.overwriteAmmo = ammo;
+		ldata.rotationZ = rotationZ;
+		ldata.rotationX = rotationX;
+		ldata.field_50 = nullptr;
+		ldata.target = nullptr;
+		ldata.drawn_time.first = 1.0f;
+		ldata.drawn_time.second = 0.0f;
+		ldata.cell = a->GetParentCell();
+		ldata.CastItem = nullptr;
+		ldata.castingSource = RE::MagicSystem::CastingSource::kOther;
+		ldata.ammoEnchantment = nullptr;
+		ldata.poison = nullptr;
+		ldata.area = 0;
+		ldata.Effectiveness = 1.0f;
 		ldata.scale = 1.0f;
 		*(uint32_t*)&ldata.field_9C = 0x10000;
 		ldata.field_A0 = 0;
@@ -144,6 +176,19 @@ namespace Impl
 		return handle;
 	}
 
+	// `caster` launches arrow from the given `position`
+	uint32_t cast(RE::Actor* caster, const RE::NiPoint3& start_pos,
+		const ProjectileRot& rot, RE::TESAmmo* ammo, RE::TESObjectWEAP* weap)
+	{
+		Projectile__LaunchData ldata;
+		init_Launchdata(ldata, caster, start_pos, rot.z, rot.x, ammo, weap);
+
+		uint32_t handle;
+		CreateProjectile_14074B170(&handle, &ldata);
+
+		return handle;
+	}
+
 	uint32_t cast1(RE::MagicCaster* a, RE::Actor* caster, const RE::NiPoint3& start_pos,
 		const ProjectileRot rot)
 	{
@@ -160,8 +205,8 @@ namespace Impl
 		return handle;
 	}
 }
-using Impl::cast;
 using Sounds::play_cast_sound;
+using Impl::cast;
 
 uint32_t cast_CustomPos(RE::Actor* caster, RE::SpellItem* spel,
 	const RE::NiPoint3& start_pos, const ProjectileRot& rot, bool withSound)
@@ -174,10 +219,31 @@ uint32_t cast_CustomPos(RE::Actor* caster, RE::SpellItem* spel,
 	if (proj)
 	{
 		set_CustomPosType(proj);
+
+		if (withSound)
+			play_cast_sound(proj, spel, start_pos);
+
+		logger::info("{} {}", rot.x, rot.z);
+	}
+
+	return handle;
+}
+
+uint32_t cast_CustomPos(RE::Actor* caster, RE::TESAmmo* ammo,
+	RE::TESObjectWEAP* weap, const RE::NiPoint3& start_pos, const ProjectileRot& rot, bool withSound)
+{
+	auto handle = cast(caster, start_pos, rot, ammo, weap);
+
+	RE::TESObjectREFRPtr _refr;
+	RE::LookupReferenceByHandle(handle, _refr);
+	auto proj = _refr.get() ? _refr.get()->As<RE::Projectile>() : nullptr;
+	if (proj) {
+		set_CustomPosType(proj);
+		proj->power = 0.75f;
 	}
 
 	if (proj && withSound) {
-		play_cast_sound(proj, spel, start_pos);
+		//play_cast_sound(proj, spel, start_pos);
 	}
 
 	return handle;
@@ -237,27 +303,32 @@ void reset_json() {
 	read_json();
 }
 
-extern "C" 
+extern "C"
 {
-	DLLEXPORT void FenixProjectilesAPI_set_NormalType(RE::Projectile* proj) { return set_NormalType(proj); }
+	DLLEXPORT void FenixProjectilesAPI_set_NormalType(RE::Projectile* proj)
+	{
+		return init_NormalType(proj);
+	}
 
-	DLLEXPORT void FenixProjectilesAPI_set_CustomPosType(RE::Projectile* proj) { return set_CustomPosType(proj); }
+	DLLEXPORT void FenixProjectilesAPI_set_CustomPosType(RE::Projectile* proj)
+	{
+		return set_CustomPosType(proj);
+	}
 
-	DLLEXPORT uint32_t FenixProjectilesAPI_cast(RE::Actor* caster, RE::SpellItem* spel, const RE::NiPoint3& start_pos,
-		const ProjectileRot& rot)
+	DLLEXPORT uint32_t FenixProjectilesAPI_cast(RE::Actor* caster, RE::SpellItem* spel,
+		const RE::NiPoint3& start_pos, const ProjectileRot& rot)
 	{
 		return cast(caster, spel, start_pos, rot);
 	}
 
-	DLLEXPORT uint32_t FenixProjectilesAPI_cast_CustomPos(RE::Actor* caster, RE::SpellItem* spel, const RE::NiPoint3& start_pos,
-		const ProjectileRot& rot)
+	DLLEXPORT uint32_t FenixProjectilesAPI_cast_CustomPos(RE::Actor* caster,
+		RE::SpellItem* spel, const RE::NiPoint3& start_pos, const ProjectileRot& rot)
 	{
 		return cast_CustomPos(caster, spel, start_pos, rot);
 	}
 
-	DLLEXPORT uint32_t FenixProjectilesAPI_cast_CustomPos_withsound(RE::Actor* caster, RE::SpellItem* spel,
-		const RE::NiPoint3& start_pos,
-		const ProjectileRot& rot)
+	DLLEXPORT uint32_t FenixProjectilesAPI_cast_CustomPos_withsound(RE::Actor* caster,
+		RE::SpellItem* spel, const RE::NiPoint3& start_pos, const ProjectileRot& rot)
 	{
 		return cast_CustomPos_withsound(caster, spel, start_pos, rot);
 	}

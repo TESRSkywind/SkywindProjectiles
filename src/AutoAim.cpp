@@ -164,6 +164,11 @@ namespace AutoAim
 			get_runtime_data(proj).set_AutoAimParam(acc_or_speed);
 		}
 
+		void set_NormalType(RE::Projectile* proj)
+		{
+			return set_AutoAimType(proj, AutoAimTypes::Normal, 0);
+		}
+
 		// 3rd is acc_or_rottime
 		auto get_onCreate_data(uint32_t key)
 		{
@@ -197,6 +202,11 @@ namespace AutoAim
 		auto get_AutoAimParam(RE::Projectile* proj)
 		{
 			return get_runtime_data(proj).get_AutoAimParam();
+		}
+
+		static bool is_AutoAimType(RE::Projectile* proj)
+		{
+			return get_runtime_data(proj).isAutoAim();
 		}
 	}
 	using Data::get_findTarget_data;
@@ -510,7 +520,7 @@ namespace AutoAim
 			if (auto target = Targeting::findTarget(proj)) {
 				RE::NiPoint3 final_vel;
 				if (!get_shoot_dir(proj, target, dtime, final_vel))
-					return set_NormalType(proj);
+					return AutoAim::Data::set_NormalType(proj);
 
 				auto type = Data::get_AutoAimType(proj);
 				auto param = Data::get_AutoAimParam(proj);
@@ -554,7 +564,7 @@ namespace AutoAim
 						proj_dir.y, proj_dir.z);
 				}
 			} else {
-				set_NormalType(proj);
+				AutoAim::Data::set_NormalType(proj);
 			}
 		}
 	}
@@ -577,15 +587,10 @@ namespace AutoAim
 				float dtime)
 			{
 				bool ans = _Projectile__apply_gravity(proj, dV, dtime);
-				if (is_AutoAimType(proj)) {
+				if (Data::is_AutoAimType(proj)) {
 					Moving::change_direction(proj, dV, dtime);
 				}
 				return ans;
-			}
-
-			static bool is_AutoAimType(RE::Projectile* proj)
-			{
-				return get_runtime_data(proj).isAutoAim();
 			}
 
 			static inline REL::Relocation<decltype(change_direction)>
@@ -677,6 +682,26 @@ namespace AutoAim
 		};
 	}
 
+	auto rot_at(RE::NiPoint3 dir)
+	{
+		ProjectileRot rot;
+		auto len = dir.Unitize();
+		if (len == 0) {
+			rot = { 0, 0 };
+		} else {
+			float polar_angle = _generic_foo_<68820, float(RE::NiPoint3 * p)>::eval(
+				&dir);  // SkyrimSE.exe+c51f70
+			rot = { -asin(dir.z), polar_angle };
+		}
+
+		return rot;
+	}
+
+	auto rot_at(const RE::NiPoint3& from, const RE::NiPoint3& to)
+	{
+		return rot_at(to - from);
+	}
+
 	void onCreated(RE::Projectile* proj, uint32_t key)
 	{
 		if (auto data = get_onCreate_data(key);
@@ -687,8 +712,23 @@ namespace AutoAim
 				if (caster_type == AutoAimCaster::NPC && !isPlayer ||
 					caster_type == AutoAimCaster::Player && isPlayer ||
 					caster_type == AutoAimCaster::Both) {
-					Data::set_AutoAimType(proj, std::get<AutoAimTypes>(data),
-						std::get<float>(data));
+					if (proj->IsBeamProjectile() || proj->IsFlameProjectile()) {
+						if (auto target = Targeting::findTarget(proj)) {
+							set_CustomPosType(proj);
+							auto dir = rot_at(proj->GetPosition(),
+								Moving::get_victim_pos(target, 0));
+
+							_generic_foo_<19362, void(RE::TESObjectREFR * refr,
+													 float rot_Z)>::eval(proj, dir.z);
+							_generic_foo_<19360, void(RE::TESObjectREFR * refr,
+													 float rot_X)>::eval(proj, dir.x);
+						}
+					}
+
+					if (proj->IsMissileProjectile()) {
+						Data::set_AutoAimType(proj, std::get<AutoAimTypes>(data),
+							std::get<float>(data));
+					}
 				}
 			}
 		}

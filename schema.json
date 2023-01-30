@@ -59,17 +59,11 @@
     },
 
 
-
-    "FormOrKey": {
-      "oneOf": [
-        { "$ref": "#/$defs/PluginFormID" },
-        { "$ref": "#/$defs/form_key" }
-      ]
-    },
     "FormOrID": {
       "oneOf": [
         { "$ref": "#/$defs/PluginFormID" },
-        { "$ref": "#/$defs/formID" }
+        { "$ref": "#/$defs/formID" },
+        { "$ref": "#/$defs/form_key" }
       ]
     },
     "formID": {
@@ -180,8 +174,40 @@
 
 
 
+
+
+
+    "MulticastEmpty": {
+      "allOf": [
+        {"not": {"required": ["arrowID"]}},
+        {"not": {"required": ["spellID"]}},
+        {"not": {"required": ["weapID"]}}
+      ],
+      "description": "Fallback to defaults"
+    },
     "SpellID": {
-      "oneOf": [ { "$ref": "#/$defs/FormOrKey" }, { "const": "Current" } ], "description": "A spell to cast"
+      "oneOf": [ { "$ref": "#/$defs/FormOrID" }, { "const": "Current" } ], "description": "A spell to cast"
+    },
+    "MulticastSpell": {
+      "allOf": [
+        {"required": ["spellID"]},
+        {"not": {"required": ["arrowID"]}},
+        {"not": {"required": ["weapID"]}}
+      ],
+      "description": "Data dor spell projectile"
+    },
+    "ArrowID": {
+      "oneOf": [ { "$ref": "#/$defs/FormOrID" }, { "const": "Current" } ], "description": "An arrow to fire"
+    },
+    "WeapID": {
+      "oneOf": [ { "$ref": "#/$defs/FormOrID" }, { "const": "Current" } ], "description": "A weap that fires"
+    },
+    "MulticastArrow": {
+      "description": "Data dor spell projectile",
+      "allOf": [
+        {"required": ["weapID"]},
+        {"not": {"required": ["spellID"]}}
+      ]
     },
     "MultiCastShape": {
       "description": "How to position projectiles (default: Single)",
@@ -204,8 +230,8 @@
       "type": "object",
       "description": "Should new projectile be new type (homing, emitter etc)",
       "properties": {
-        "Emitter": { "$ref": "#/$defs/FormOrKey", "description": "Set th projectile to emitter with this key" },
-        "Homing": { "$ref": "#/$defs/FormOrKey", "description": "Set th projectile to homing with this key" }
+        "Emitter": { "$ref": "#/$defs/FormOrID", "description": "Set th projectile to emitter with this key" },
+        "Homing": { "$ref": "#/$defs/FormOrID", "description": "Set th projectile to homing with this key" }
       },
       "additionalProperties": false
     },
@@ -215,10 +241,14 @@
       "properties": {
         "shape": { "$ref": "#/$defs/MultiCastShape" },
         "rotation": { "$ref": "#/$defs/MultiCastRotation" },
-        "spellID": { "$ref": "#/$defs/SpellID" },
         "sound": { "$ref": "#/$defs/MultiCastSound" },
         "count": { "$ref": "#/$defs/Count" },
         "NewProjType": { "$ref": "#/$defs/NewProjType" },
+
+        "arrowID": { "$ref": "#/$defs/ArrowID" },
+        "weapID": { "$ref": "#/$defs/WeapID" },
+        "spellID": { "$ref": "#/$defs/SpellID" },
+
         "spawnData": {
           "type": "array",
           "minItems": 1,
@@ -230,7 +260,6 @@
               "rotDelta": { "$ref": "#/$defs/point2", "description": "Delta for angles" },
               "pos": { "$ref": "#/$defs/point3", "description": "Origin center" },
               "posRnd": { "$ref": "#/$defs/point3", "description": "Max delta for random origin" },
-              "spellID": { "$ref": "#/$defs/SpellID" },
               "rotation": { "$ref": "#/$defs/MultiCastRotation" },
               "sound": { "$ref": "#/$defs/MultiCastSound" },
               "shape": { "$ref": "#/$defs/MultiCastShape" },
@@ -241,7 +270,11 @@
                 "type": "integer",
                 "description": "Shape size (usually 50--200). If shape is not Single, MUST present",
                 "minimum": 1
-              }
+              },
+
+              "arrowID": { "$ref": "#/$defs/ArrowID" },
+              "weapID": { "$ref": "#/$defs/WeapID" },
+              "spellID": { "$ref": "#/$defs/SpellID" }
             },
             "allOf": [
               {
@@ -261,10 +294,20 @@
                 }
               }
             ],
+            "oneOf": [
+              { "$ref": "#/$defs/MulticastArrow" },
+              { "$ref": "#/$defs/MulticastSpell" },
+              { "$ref": "#/$defs/MulticastEmpty" }
+            ],
             "unevaluatedProperties": false
           }
         }
       },
+
+      "oneOf": [
+        { "$ref": "#/$defs/MulticastArrow" },
+        { "$ref": "#/$defs/MulticastSpell" }
+      ],
       "required": [ "spawnData" ],
       "unevaluatedProperties": false
       
@@ -297,6 +340,21 @@
         "required": ["key"]
       }
     },
+    "ifEmittersChangeTypeType": {
+      "$comment": "NewProjType to change type",
+      "if": {
+        "properties": {
+          "type": { "const": "ChangeType" }
+        },
+        "required": ["type"]
+      },
+      "then": {
+        "properties": {
+          "NewProjType": { "$ref": "#/$defs/NewProjType" }
+        },
+        "required": ["NewProjType"]
+      }
+    },
     "EmittersData": {
       "type": "object",
       "description": "Emitters data. Used while searching by bproj.formID or just key",
@@ -308,13 +366,15 @@
           "maximum": 20
         },
         "type": {
-          "enum": [ "Multicast" ]
+          "enum": [ "Multicast", "ChangeType" ],
+          "description": "A function to call"
         }
       },
       "allOf": [
-        { "$ref": "#/$defs/ifEmittersMulticastType" }
+        { "$ref": "#/$defs/ifEmittersMulticastType" },
+        { "$ref": "#/$defs/ifEmittersChangeTypeType" }
       ],
-      "required": [ "type", "interval", "key" ],
+      "required": [ "type", "interval" ],
       "unevaluatedProperties": false
     },
     "Emitters": {

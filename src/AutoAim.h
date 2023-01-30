@@ -27,4 +27,9 @@ namespace AutoAim
 
 	// Apply hooks
 	void install();
+
+	namespace Data
+	{
+		void set_NormalType(RE::Projectile* proj);
+	}
 }

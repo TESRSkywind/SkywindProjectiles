@@ -21,13 +21,13 @@ private:
 	static void Ctor(RE::Projectile* proj, char a2)
 	{
 		_TESForm__SetInitedFormFlag_140194B90(proj, a2);
-		set_NormalType(proj);
+		init_NormalType(proj);
 	}
 
 	static void __fastcall LoadGame(RE::Projectile* proj, RE::BGSLoadGameBuffer* buf)
 	{
 		_TESObjectREFR__ReadFromSaveGame_140286FD0(proj, buf);
-		set_NormalType(proj);
+		init_NormalType(proj);
 	}
 
 	static inline REL::Relocation<decltype(Ctor)> _TESForm__SetInitedFormFlag_140194B90;
@@ -95,7 +95,7 @@ public:
 				}
 			} xbyakCode{ uintptr_t(update_node_pos), ret_addr };
 
-			FenixUtils::add_trampoline<5, 42586, 0x2c1>(&xbyakCode);  // SkyrimSE.exe+621285
+			FenixUtils::add_trampoline<5, 42586, 0x2c1>(&xbyakCode);  // SkyrimSE.exe+733F81
 		}
 
 		_TESObjectREFR__SetPosition_140296910 =
@@ -153,6 +153,88 @@ private:
 	static inline REL::Relocation<decltype(UpdateRotX)> _Projectile__SetRotationX;
 };
 
+class MultipleFlamesHook
+{
+public:
+	static void Hook()
+	{
+		auto& trmpl = SKSE::GetTrampoline();
+
+		{
+			// SkyrimSE.exe+73d9d0
+			uintptr_t ret_addr = REL::ID(42727).address() + 0x241;
+
+			struct Code : Xbyak::CodeGenerator
+			{
+				Code(uintptr_t func_addr, uintptr_t ret_addr)
+				{
+					Xbyak::Label nocancel;
+
+					// rsi  = proj
+					// xmm7 -- xmm9 = node pos
+					movss(xmm0, xmm7);
+					movss(xmm1, xmm8);
+					movss(xmm2, xmm9);
+					mov(r9, rsi);
+					mov(rax, func_addr);
+					call(rax);
+					mov(rax, ret_addr);
+					jmp(rax);
+				}
+			} xbyakCode{ uintptr_t(update_node_pos), ret_addr };
+
+			FenixUtils::add_trampoline<5, 42727, 0x22f>(
+				&xbyakCode);  // SkyrimSE.exe+73d9d0
+		}
+
+		_j_TESObjectREFR__SetRotationZ_14074FEE0 = trmpl.write_call<5>(
+			REL::ID(42727).address() + 0x133, UpdateRotZ);  // SkyrimSE.exe+73d9d0
+		_TESObjectREFR__SetPosition_140296910 = trmpl.write_call<5>(
+			REL::ID(42727).address() + 0x24b, UpdatePos);  // SkyrimSE.exe+73d9d0
+		_Projectile__SetRotationX = trmpl.write_call<5>(REL::ID(42727).address() + 0x146,
+			UpdateRotX);  // SkyrimSE.exe+73d9d0
+	}
+
+private:
+	static void update_node_pos(float x, float y, float z, RE::Projectile* proj)
+	{
+		if (auto node = proj->Get3D()) {
+			if (!is_CustomPosType(proj)) {
+				node->local.translate.x = x;
+				node->local.translate.y = y;
+				node->local.translate.z = z;
+			}
+		}
+	}
+
+	static void UpdateRotZ(RE::Projectile* proj, float rot_Z)
+	{
+		if (!is_CustomPosType(proj)) {
+			_j_TESObjectREFR__SetRotationZ_14074FEE0(proj, rot_Z);
+		}
+	}
+
+	static void UpdateRotX(RE::Projectile* proj, float rot_X)
+	{
+		if (!is_CustomPosType(proj)) {
+			_Projectile__SetRotationX(proj, rot_X);
+		}
+	}
+
+	static void UpdatePos(RE::Projectile* proj, RE::NiPoint3* pos)
+	{
+		if (!is_CustomPosType(proj)) {
+			_TESObjectREFR__SetPosition_140296910(proj, pos);
+		}
+	}
+
+	static inline REL::Relocation<decltype(UpdateRotZ)>
+		_j_TESObjectREFR__SetRotationZ_14074FEE0;
+	static inline REL::Relocation<decltype(UpdateRotX)> _Projectile__SetRotationX;
+	static inline REL::Relocation<decltype(UpdatePos)>
+		_TESObjectREFR__SetPosition_140296910;
+};
+
 class NormLightingsHook
 {
 public:
@@ -180,13 +262,13 @@ public:
 	static void Hook()
 	{
 		_Usage1 = SKSE::GetTrampoline().write_call<5>(REL::ID(13629).address() + 0x130,
-			CreateProjectile_14074B170_1);  // SkyrimSE.exe+16CDD0
+			CreateProjectile_14074B170_1);  // SkyrimSE.exe+16CDD0 -- placeatme
 		_Usage2 = SKSE::GetTrampoline().write_call<5>(REL::ID(17693).address() + 0xe82,
-			CreateProjectile_14074B170_2);  // SkyrimSE.exe+2360C2
+			CreateProjectile_14074B170_2);  // SkyrimSE.exe+2360C2 -- TESObjectWEAP::Fire_140235240
 		_Usage3 = SKSE::GetTrampoline().write_call<5>(REL::ID(33672).address() + 0x377,
-			CreateProjectile_14074B170_3);  // SkyrimSE.exe+550A37
+			CreateProjectile_14074B170_3);  // SkyrimSE.exe+550A37 -- ActorMagicCaster::castProjectile
 		_Usage4 = SKSE::GetTrampoline().write_call<5>(REL::ID(35450).address() + 0x20e,
-			CreateProjectile_14074B170_4);  // SkyrimSE.exe+5A897E
+			CreateProjectile_14074B170_4);  // SkyrimSE.exe+5A897E -- ChainExplosion
 	}
 
 private:

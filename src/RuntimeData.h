@@ -58,4 +58,4 @@ FenixProjsRuntimeData& get_runtime_data(RE::Projectile* proj);
 
 bool is_CustomPosType(RE::Projectile* proj);
 void set_CustomPosType(RE::Projectile* proj);
-void set_NormalType(RE::Projectile* proj);
+void init_NormalType(RE::Projectile* proj);

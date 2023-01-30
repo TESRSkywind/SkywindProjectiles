@@ -1,5 +1,6 @@
 #include "RuntimeData.h"
 #include "Multicast.h"
+#include "AutoAim.h"
 
 namespace Emitters
 {
@@ -7,11 +8,22 @@ namespace Emitters
 	{
 		class JsonStorage
 		{
+		public:
+			// What can happend in update
+			enum class FunctionTypes : uint32_t
+			{
+				Multicast,
+				ChangeType
+			};
+
+			using JsonDataItem_data_t = std::variant<uint32_t, NewProjType>;  // FunctionTypes
+
+		private:
 			// Stored in Json, queried every function call
 			struct JsonDataItem
 			{
-				uint32_t function_key;  // key of function to call
-				float interval;         // in RuntimeData
+				float interval;            // in RuntimeData
+				JsonDataItem_data_t data;  // Multicast: key; ChangeType: NewProjType
 			};
 
 			using Map_t = std::unordered_map<uint32_t, JsonDataItem>;
@@ -19,14 +31,28 @@ namespace Emitters
 			static inline Map_t EmittersData;  // runtime_key -> data { int, func_key }
 			static inline std::unordered_map<uint32_t, uint32_t>
 				EmittersMap;  // big_key -> runtime_key
-		
+
 			// init JsonDataItem entry and insert it to the map
 			static void read_json_entry_global(const Json::Value& item,
 				uint32_t runtime_key)
 			{
 				JsonDataItem data;
 				data.interval = item["interval"].asFloat();
-				data.function_key = JsonUtils::get_formid(item["key"].asString());
+				FunctionTypes type =
+					parse_enum<FunctionTypes::Multicast>(item["type"].asString());
+				switch (type) {
+				case FunctionTypes::Multicast:
+					std::get<uint32_t>(data.data) =
+						JsonUtils::get_formid(item["key"].asString());
+					break;
+				case FunctionTypes::ChangeType:
+					data.data = NewProjType{};
+					std::get<NewProjType>(data.data).init(item);
+					break;
+				default:
+					break;
+				}
+
 				EmittersData.insert({ runtime_key, data });
 			}
 
@@ -60,7 +86,8 @@ namespace Emitters
 			}
 
 			// interval, runtime_key
-			static auto query_oncreated(uint32_t big_key) {
+			static auto query_oncreated(uint32_t big_key)
+			{
 				std::tuple<float, uint32_t> ans = {};
 				if (auto found = EmittersMap.find(big_key); found != EmittersMap.end()) {
 					auto runtime_key = (*found).second;
@@ -76,14 +103,14 @@ namespace Emitters
 			}
 
 			// function_key
-			static uint32_t query_update(uint32_t runtime_key)
+			static JsonDataItem_data_t query_update(uint32_t runtime_key)
 			{
 				if (auto found = EmittersData.find(runtime_key);
 					found != EmittersData.end()) {
-					return (*found).second.function_key;
+					return (*found).second.data;
 				}
 
-				return 0;
+				return JsonDataItem_data_t{};
 			}
 		};
 
@@ -98,33 +125,97 @@ namespace Emitters
 		}
 
 		bool is_Emitter(RE::Projectile* proj) { return get_interval(proj) > 0; }
+
+		void set_normalType(RE::Projectile* proj)
+		{
+			get_runtime_data(proj).set_EmitterKey(0);
+			get_runtime_data(proj).set_EmitterInterval(0);
+		}
 	}
 
-	void call_func(RE::Projectile* proj, uint32_t function_key, RE::Actor* caster,
-		RE::SpellItem* spel)
-	{
-		auto curpos = proj->GetPosition();
+	void onCreated(RE::Projectile* proj, uint32_t big_key);
 
-		ManyProjs::Casting::CastData cast_data;
-		cast_data.startPos = &curpos;
-		cast_data.caster = caster;
-		cast_data.parallel_rot = { proj->data.angle.x, proj->data.angle.z };
-		cast_data.spel = spel;
-		ManyProjs::Casting::onManyCasted(function_key, cast_data);
+	auto rot_at(RE::NiPoint3 dir)
+	{
+		ProjectileRot rot;
+		auto len = dir.Unitize();
+		if (len == 0) {
+			rot = { 0, 0 };
+		} else {
+			float polar_angle = _generic_foo_<68820, float(RE::NiPoint3 * p)>::eval(&dir);  // SkyrimSE.exe+c51f70
+			rot = { -asin(dir.z), polar_angle };
+		}
+
+		return rot;
+	}
+
+	auto rot_at(const RE::NiPoint3& from, const RE::NiPoint3& to) { return rot_at(to - from); }
+
+	void call_func(RE::Projectile* proj, Data::JsonStorage::JsonDataItem_data_t data,
+		RE::Actor* caster)
+	{
+		using FunctionTypes = Data::JsonStorage::FunctionTypes;
+
+		FunctionTypes type = (FunctionTypes)data.index();
+		switch (type) {
+		case FunctionTypes::Multicast:
+			{
+				auto function_key = std::get<uint32_t>(data);
+				auto curpos = proj->GetPosition();
+
+				ManyProjs::Casting::CastData cast_data;
+				cast_data.startPos = &curpos;
+				cast_data.caster = caster;
+				cast_data.parallel_rot = rot_at(proj->linearVelocity);
+
+				if (auto ammo = proj->ammoSource) {
+					cast_data.data = ManyProjs::Casting::CastData::ArrowData{ proj->weaponSource, ammo };
+				} else if (auto spel = proj->spell) {
+					cast_data.data = ManyProjs::Casting::CastData::SpellData{ spel->As<RE::SpellItem>() };
+				} else {
+					cast_data.data = ManyProjs::Casting::CastData::SpellData{ nullptr };
+				}
+
+				ManyProjs::Casting::onManyCasted(function_key, cast_data);
+			}
+			break;
+		case FunctionTypes::ChangeType:
+			{
+				auto new_types = std::get<NewProjType>(data);
+
+				auto emitter_key = new_types.emitter;
+				if (emitter_key != 0) {
+					if (emitter_key == -1) {
+						Data::set_normalType(proj);
+					} else {
+						onCreated(proj, emitter_key);
+					}
+				}
+
+				auto homing_key = new_types.homing;
+				if (homing_key != 0) {
+					if (homing_key == -1) {
+						AutoAim::Data::set_NormalType(proj);
+					} else {
+						AutoAim::onCreated(proj, homing_key);
+					}
+				}
+			}
+			break;
+		default:
+			break;
+		}
 	}
 
 	void onUpdate(RE::Projectile* proj, float)
 	{
 		auto _caster = proj->shooter.get().get();
-		if (!_caster)
+		if (!_caster || !_caster->As<RE::Actor>() || proj->distanceMoved > 10000) {
+			Data::set_normalType(proj);
 			return;
-		auto caster = _caster->As<RE::Actor>();
-		if (!caster)
-			return;
+		}
 
-		auto spel = proj->spell->As<RE::SpellItem>();
-		if (!spel)
-			return;
+		auto caster = _caster->As<RE::Actor>();
 
 		if (proj->livingTime < Data::get_interval(proj))
 			return;
@@ -135,8 +226,8 @@ namespace Emitters
 
 		proj->livingTime = 0.000001f;
 
-		auto function_key = Data::JsonStorage::query_update(runtime_key);
-		call_func(proj, function_key, caster, spel);
+		auto data = Data::JsonStorage::query_update(runtime_key);
+		call_func(proj, data, caster);
 	}
 
 	void onCreated(RE::Projectile* proj, uint32_t big_key) {
@@ -158,9 +249,12 @@ namespace Emitters
 		public:
 			static void Hook()
 			{
-				_smth_explode =
-					SKSE::GetTrampoline().write_call<5>(REL::ID(42852).address() + 0x680,
-						smth_explode);  // SkyrimSE.exe+745450
+				_smth_explode = SKSE::GetTrampoline().write_call<5>(REL::ID(42852).address() + 0x680,
+					smth_explode);  // SkyrimSE.exe+745450
+				_AddImpact = SKSE::GetTrampoline().write_call<5>(REL::ID(42547).address() + 0x56,
+					AddImpact);  // SkyrimSE.exe+745450 -- disable on hit
+				_sub_140BEDB60 = SKSE::GetTrampoline().write_call<5>(REL::ID(42930).address() + 0x21,
+					sub_140BEDB60);  // SkyrimSE.exe+74BC21 -- disable on destroy
 			}
 
 		private:
@@ -173,7 +267,27 @@ namespace Emitters
 				return _smth_explode(proj, dtime);
 			}
 
+			static void* AddImpact(RE::Projectile* proj, RE::TESObjectREFR* a2, RE::NiPoint3* a3, RE::NiPoint3* a_velocity,
+				RE::hkpCollidable* a_collidable, uint32_t a6, char a7)
+			{
+				auto ans = _AddImpact(proj, a2, a3, a_velocity, a_collidable, a6, a7);
+				if (Data::is_Emitter(proj)) {
+					Data::set_normalType(proj);
+				}
+				return ans;
+			}
+
+			static void sub_140BEDB60(char* sound) {
+				_sub_140BEDB60(sound);
+				auto proj = reinterpret_cast<RE::Projectile*>(sound - 0x128);
+				if (Data::is_Emitter(proj)) {
+					Data::set_normalType(proj);
+				}
+			}
+
 			static inline REL::Relocation<decltype(smth_explode)> _smth_explode;
+			static inline REL::Relocation<decltype(AddImpact)> _AddImpact;
+			static inline REL::Relocation<decltype(sub_140BEDB60)> _sub_140BEDB60;
 		};
 	}
 

@@ -19,11 +19,25 @@ namespace ManyProjs
 		{
 			RE::Actor* caster;
 			ProjectileRot parallel_rot;
-			RE::SpellItem* spel;
 			RE::NiPoint3* startPos;
+			
+			struct SpellData
+			{
+				RE::SpellItem* spel;
+			};
+
+			struct ArrowData
+			{
+				RE::TESObjectWEAP* weap;
+				RE::TESAmmo* ammo;
+			};
+
+			std::variant<SpellData, ArrowData> data;
 		};
 
-		/// Perform multicast. <param name="key">used for find multicast data</param>
+		bool is_ManyCasted(uint32_t key);
+
+		/// Perform multicast. <param name="key">used for find multicast data</param>. cast_data.data is empty
 		void onManyCasted(uint32_t key, CastData& cast_data);
 	}
 }
