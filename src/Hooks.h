@@ -33,7 +33,7 @@ private:
 	static inline REL::Relocation<decltype(Ctor)> _TESForm__SetInitedFormFlag_140194B90;
 	static inline REL::Relocation<decltype(LoadGame)> _TESObjectREFR__ReadFromSaveGame_140286FD0;
 };
-
+/*
 class InitStartPosHook
 {
 public:
@@ -65,7 +65,7 @@ private:
 	static inline REL::Relocation<decltype(InitStartPos)> _TESObjectREFR__SetPosition_140296910;
 	static inline REL::Relocation<decltype(mb_autoaim)> _mb_autoaim;
 };
-
+*/
 class MultipleBeamsHook
 {
 public:
@@ -100,9 +100,8 @@ public:
 
 		_TESObjectREFR__SetPosition_140296910 =
 			trmpl.write_call<5>(REL::ID(42586).address() + 0x2db, UpdatePos);  // SkyrimSE.exe+733F9B
-		_j_TESObjectREFR__SetRotationZ_14074FEE0 =
-			trmpl.write_call<5>(REL::ID(42586).address() + 0x1ba, UpdateRotZ);                          // SkyrimSE.exe+733E7A
-		_Projectile__SetRotationX = trmpl.write_call<5>(REL::ID(42586).address() + 0x1cd, UpdateRotX);  // SkyrimSE.exe+733E8D
+		
+		_Projectile__SetRotation = trmpl.write_call<5>(REL::ID(42586).address() + 0x249, UpdateRot);  // SkyrimSE.exe+733F09
 	}
 
 private:
@@ -112,13 +111,13 @@ private:
 		if (!found || !*proj)
 			return found;
 
-		return !is_CustomPosType(*proj);
+		return !is_MyBeamType(*proj);
 	}
 
 	static void update_node_pos(float x, float y, float z, RE::Projectile* proj)
 	{
 		if (auto node = proj->Get3D()) {
-			if (!is_CustomPosType(proj)) {
+			if (!is_MyBeamType(proj)) {
 				node->local.translate.x = x;
 				node->local.translate.y = y;
 				node->local.translate.z = z;
@@ -128,31 +127,23 @@ private:
 
 	static void UpdatePos(RE::Projectile* proj, RE::NiPoint3* pos)
 	{
-		if (!is_CustomPosType(proj)) {
+		if (!is_MyBeamType(proj)) {
 			_TESObjectREFR__SetPosition_140296910(proj, pos);
 		}
 	}
 
-	static void UpdateRotZ(RE::Projectile* proj, float rot_Z)
+	static void UpdateRot(RE::Projectile* proj, float rot_X)
 	{
-		if (!is_CustomPosType(proj)) {
-			_j_TESObjectREFR__SetRotationZ_14074FEE0(proj, rot_Z);
-		}
-	}
-
-	static void UpdateRotX(RE::Projectile* proj, float rot_X)
-	{
-		if (!is_CustomPosType(proj)) {
-			_Projectile__SetRotationX(proj, rot_X);
+		if (!is_MyBeamType(proj)) {
+			_Projectile__SetRotation(proj, rot_X);
 		}
 	}
 
 	static inline REL::Relocation<decltype(NewBeam)> _RefHandle__get;
 	static inline REL::Relocation<decltype(UpdatePos)> _TESObjectREFR__SetPosition_140296910;
-	static inline REL::Relocation<decltype(UpdateRotZ)> _j_TESObjectREFR__SetRotationZ_14074FEE0;
-	static inline REL::Relocation<decltype(UpdateRotX)> _Projectile__SetRotationX;
+	static inline REL::Relocation<decltype(UpdateRot)> _Projectile__SetRotation;
 };
-
+/*
 class MultipleFlamesHook
 {
 public:
@@ -234,7 +225,7 @@ private:
 	static inline REL::Relocation<decltype(UpdatePos)>
 		_TESObjectREFR__SetPosition_140296910;
 };
-
+*/
 class NormLightingsHook
 {
 public:
@@ -248,7 +239,8 @@ private:
 	static RE::BeamProjectile* Ctor(RE::BeamProjectile* proj, void* LaunchData) {
 		proj = _BeamProjectile__ctor(proj, LaunchData);
 		if (auto spell = proj->spell; spell && spell->GetCastingType() == RE::MagicSystem::CastingType::kFireAndForget) {
-			set_CustomPosType(proj);
+			proj->flags.set(RE::Projectile::Flags::kUseOrigin);
+			proj->flags.reset(RE::Projectile::Flags::kAutoAim);
 		}
 		return proj;
 	}
@@ -324,7 +316,7 @@ private:
 	{
 		_Update(a, delta);
 
-		DebugAPI_IMPL::DebugAPI::Update();
+		SKSE::GetTaskInterface()->AddUITask([]() { DebugAPI_IMPL::DebugAPI::Update(); });
 	}
 
 	static inline REL::Relocation<decltype(Update)> _Update;

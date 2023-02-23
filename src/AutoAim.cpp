@@ -714,7 +714,6 @@ namespace AutoAim
 					caster_type == AutoAimCaster::Both) {
 					if (proj->IsBeamProjectile() || proj->IsFlameProjectile()) {
 						if (auto target = Targeting::findTarget(proj)) {
-							set_CustomPosType(proj);
 							auto dir = rot_at(proj->GetPosition(),
 								Moving::get_victim_pos(target, 0));
 

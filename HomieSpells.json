@@ -2,25 +2,340 @@
 	"FormIDs": {
 		"key_spellFireball": "Skyrim.esm|0x1C789",
 		"key_spellIceSpike": "Skyrim.esm|0x2B96C",
+		"key_spellIceSpear": "Skyrim.esm|0x10F7EC",
 		"key_spellLightning": "Skyrim.esm|0x45F9D",
+		"key_spellFlames": "Skyrim.esm|0x12FCD",
 		
 		"key_projFireball": "Skyrim.esm|0x10FBED",
 		"key_projIceSpike": "Skyrim.esm|0x2F774",
-		"key_projLightning": "Skyrim.esm|0xA9D92"
+		"key_projLightning": "Skyrim.esm|0xA9D92",
+		"key_projFlames": "Skyrim.esm|0x12FCF",
+		"key_projFirebolt": "Skyrim.esm|0x12E84",
+		"key_projLowlight": "Skyrim.esm|0x58E9C",
+		"key_projIceSpear": "Skyrim.esm|0x10FBEE",
+		
+		"key_projArrowIron": "Skyrim.esm|0x3BE11",
+		"key_projArrowSteel": "Skyrim.esm|0x3BE12",
+		"key_projArrowElven": "Skyrim.esm|0x3BE15",
+		"key_projArrowGlass": "Skyrim.esm|0x3BE16",
+		"key_projArrowEbony": "Skyrim.esm|0x3BE17",
+		"key_projArrowDaedr": "Skyrim.esm|0x3BE18",
+		
+		"key_projArrowOrish": "Skyrim.esm|0x3BE13",
+		"key_projArrowDwarv": "Skyrim.esm|0x3BE14",
+		"key_projArrowFalmer": "Skyrim.esm|0x3BE19",
+		"key_projArrowForsw": "Skyrim.esm|0xCEEA1",
+
+		"key_arrowIron": "Skyrim.esm|0x1397D",
+		"key_arrowSteel": "Skyrim.esm|0x1397F",
+		
+		"key_bow1": "Skyrim.esm|0x68C57",
+
+		"key_1": "0xFF000001",
+		"key_2": "0xFF000002",
+		"key_3": "0xFF000003",
+		"key_4": "0xFF000004",
+		"key_5": "0xFF000005",
+		"key_6": "0xFF000006",
+		"key_7": "0xFF000007",
+		"key_8": "0xFF000008",
+
+		"key_home": "0xFF100005",
+		
+		"key_set_homing": "0xFF100002",
+		"key_set_homing_long": "0xFF100004",
+
+		"key_spawn_homing_lightning": "0xFF100008",
+		"key_spawn_homing_arrows": "0xFF100001",
+
+		"key_spawn_arrows_cone": "0xFF100006",
+		"key_spawn_4fireballs": "0xFF100003",
+		"key_spawn_many_frost": "0xFF100009",
+		"key_spawn_fireballs": "0xFF100007",
+		"key_spawn_lightnings": "0xFF10000A",
+
+		"key_emitter_fireball": "0xFF100005",
+		"key_emitter_light": "0xFF10000B"
+	},
+
+	"Emitters": {
+		"0x01": {
+			"type": "Multicast",
+			"interval": 0.5,
+			"key": "key_spawn_homing_lightning"
+		},
+		"0x02": {
+			"type": "Multicast",
+			"interval": 0.5,
+			"key": "key_spawn_arrows_cone"
+		},
+		"0x03": {
+			"type": "Multicast",
+			"interval": 0.5,
+			"key": "key_spawn_4fireballs"
+		},
+		"0x04": {
+			"type": "Multicast",
+			"interval": 0.5,
+			"key": "key_spawn_many_frost"
+		},
+		"0x05": {
+			"type": "ChangeType",
+			"interval": 0.5,
+			"NewProjType": {
+				"Emitter": "0xFFFFFFFF",
+				"Homing": "key_home"
+			}
+		},
+		"0x07": {
+			"type": "ChangeType",
+			"interval": 2,
+			"NewProjType": {
+				"Emitter": "0xFFFFFFFF",
+				"Homing": "key_home"
+			}
+		},
+		"0x06": {
+			"type": "Multicast",
+			"interval": 0.5,
+			"key": "key_spawn_homing_arrows"
+		},
+		"0x08": {
+			"type": "Multicast",
+			"interval": 1,
+			"key": "key_spawn_fireballs"
+		},
+		"0x09": {
+			"type": "Multicast",
+			"interval": 0.5,
+			"key": "key_spawn_lightnings"
+		}
 	},
 
 	"Skyrim.esm": {
 		"Homing": {
-			"key_projFireball": {
+			"key_projArrowOrish": {
+				"type": "ConstSpeed",
+				"rotationTime": 10
+    		},
+			"key_projArrowForsw": {
 				"type": "ConstAccel",
-				"acceleration": 50,
-				"target": "Cursor",
-				"cursorAngle": 50
+				"acceleration": 70
+    		},
+			"key_home": {
+				"type": "ConstSpeed",
+				"rotationTime": 1
+    		},
+			"key_arrowSteel": {
+				"type": "ConstSpeed",
+				"rotationTime": 0.5
     		}
 		},
 		"Multicast": {
+			"key_projArrowIron": {
+				"arrowID": "Current",
+				"weapID": "Current",
+				"spawnData": [
+					{
+						"count": 20,
+						"normal": [0,1,0],
+						"rotRnd": [0,20]
+					}
+				]
+			},
+			"key_projArrowSteel": {
+				"arrowID": "Current",
+				"weapID": "Current",
+				"spawnData": [
+					{
+						"count": 20,
+						"normal": [0,1,0],
+						"rotRnd": [10,10]
+					}
+				]
+			},
+			"key_spawn_arrows_cone": {
+				"arrowID": "Current",
+				"weapID": "Current",
+				"spawnData": [
+					{
+						"count": 20,
+						"normal": [0,1,0],
+						"rotRnd": [0,20]
+					}
+				]
+			},
+			"key_spawn_homing_lightning": {
+				"spellID": "key_spellLightning",
+				"spawnData": [
+					{
+						"count": 1,
+						"NewProjType": {
+							"Homing": "key_home"
+						}
+					}
+				]
+			},
+			"key_spawn_4fireballs": {
+				"spellID": "key_spellFireball",
+				"spawnData": [
+					{
+						"count": 4,
+						"shape": "Circle",
+						"size": 100
+					}
+				]
+			},
+			"key_spawn_many_frost": {
+				"spellID": "key_spellIceSpike",
+				"spawnData": [
+					{
+						"count": 10,
+						"normal": [0,0,-1],
+						"rotRnd": [20,20]
+					}
+				]
+			},
+			"key_spawn_homing_arrows": {
+				"arrowID": "Current",
+				"weapID":"Current",
+				"spawnData": [
+					{
+						"count": 5,
+						"rotRnd": [30,30],
+						"NewProjType": {
+							"Homing": "key_home"
+						}
+					}
+				]
+			},
+			"key_projFireball": {
+				"spellID": "Current",
+				"spawnData": [
+					{
+						"count": 10,
+						"rotRnd": [30,30],
+						"NewProjType": {
+							"Emitter": "key_set_homing_long"
+						}
+					}
+				]
+			},
+			"key_projLightning": {
+				"spellID": "Current",
+				"rotation": "ToSight",
+				"spawnData": [
+					{
+						"count": 5,
+						"pos": [0,200,1000],
+						"posRnd": [500,500,0]
+					}
+				]
+			},
+			"key_projFirebolt": {
+				"spellID": "key_spellFireball",
+				"spawnData": [
+					{
+						"count": 30,
+						"pos": [0,2000,3000],
+						"normal": [0,0,-1],
+						"rotRnd": [20,20],
+						"xDepends": false,
+						"posRnd": [500,500,2000]
+					}
+				]
+			},
+			"key_spawn_fireballs": {
+				"spellID": "key_spellFireball",
+				"spawnData": [
+					{
+						"count": 7,
+						"shape": "Circle",
+						"size": 5,
+						"rotation": "FromCenter",
+						"NewProjType": {
+							"Emitter": "key_emitter_light"
+						}
+					}
+				]
+			},
+			"key_spawn_lightnings": {
+				"spellID": "key_spellLightning",
+				"spawnData": [
+					{
+						"count": 5,
+						"shape": "Circle",
+						"size": 5,
+						"rotation": "FromCenter"
+					}
+				]
+			},
+			"key_projLowlight": {
+				"spellID": "Current",
+				"spawnData": [
+					{
+						"spellID": "key_spellFireball",
+						"normal": [0,0,1],
+						"xDepends": false,
+						"count": 10,
+						"shape": "Circle",
+						"size": 5,
+						"rotation": "FromCenter"
+					},
+					{
+						"spellID": "key_spellLightning",
+						"normal": [1,1,1],
+						"rotRnd": [10,10],
+						"xDepends": false,
+						"count": 10
+					},
+					{
+						"spellID": "key_spellLightning",
+						"normal": [-1,1,1],
+						"rotRnd": [10,10],
+						"xDepends": false,
+						"count": 10
+					},
+					{
+						"spellID": "key_spellIceSpear",
+						"rotRnd": [20,20],
+						"count": 20
+					}
+				]
+			}
 		},
 		"Emitters": {
+			"key_projArrowElven": {
+				"key": "0x01"
+			},
+			"key_projArrowGlass": {
+				"key": "0x02"
+			},
+			"key_projArrowEbony": {
+				"key": "0x03"
+			},
+			"key_projArrowDaedr": {
+				"key": "0x04"
+			},
+			"key_projArrowDwarv": {
+				"key": "0x05"
+			},
+			"key_projArrowFalmer": {
+				"key": "0x06"
+			},
+
+			"key_set_homing_long": {
+				"key": "0x07"
+			},
+			"key_set_homing": {
+				"key": "0x05"
+			},
+			"key_projIceSpear": {
+				"key": "0x08"
+			},
+			"key_emitter_light": {
+				"key": "0x09"
+			}
 		}
 	},
 

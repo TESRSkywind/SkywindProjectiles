@@ -92,7 +92,7 @@ namespace ManyProjs
 				std::vector<JsonDataItem> spawnData;
 				JsonDataItem def;
 			};
-			static_assert(sizeof(MapEntry) == 0x70);
+			//static_assert(sizeof(MapEntry) == 0x74);
 
 			using Map_t = std::unordered_map<uint32_t, MapEntry>;
 
@@ -635,10 +635,7 @@ namespace ManyProjs
 					needsound == SoundType::Every);
 
 				if (need_changetype) {
-					RE::TESObjectREFRPtr _refr;
-					RE::LookupReferenceByHandle(handle, _refr);
-					if (auto proj =
-							_refr.get() ? _refr.get()->As<RE::Projectile>() : nullptr) {
+					if (auto proj = handle.get().get()) {
 						if (key_homing)
 							AutoAim::onCreated(proj, key_homing);
 					

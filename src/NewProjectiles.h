@@ -4,11 +4,13 @@
 void read_json();
 void reset_json();
 
-uint32_t cast_CustomPos(RE::Actor* caster, RE::SpellItem* spel,
+RE::ProjectileHandle cast_CustomPos(RE::Actor* caster, RE::SpellItem* spel,
 	const RE::NiPoint3& start_pos, const ProjectileRot& rot, bool withSound = false);
 
-uint32_t cast_CustomPos(RE::Actor* caster, RE::TESAmmo* ammo, RE::TESObjectWEAP* weap,
+RE::ProjectileHandle cast_CustomPos(RE::Actor* caster, RE::TESAmmo* ammo, RE::TESObjectWEAP* weap,
 	const RE::NiPoint3& start_pos, const ProjectileRot& rot, bool withSound = false);
+
+bool is_MyBeamType(RE::Projectile* proj);
 
 namespace Sounds
 {

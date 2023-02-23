@@ -1,6 +1,10 @@
 # New projectiles documentation
 
-Settings could be reloaded by Numpad7 key in game!
+[Showcase](https://www.youtube.com/watch?v=eRle4_ABaFI).
+
+Settings could be reloaded by Numpad7 key in game.
+
+**It is highly recommended to validate your json with schema!**
 
 ## Root
 
@@ -19,13 +23,13 @@ Example:
 ### FormIDs
 
 A map: string -> [Plugin formID](#plugin-formid) for more convenience.  
-Keys are started with `key_`. It is useful to store and use everywhere `"key_fireballSpell"` instead of `"Skyrim.esm|0x1C789"`.
+Keys must start with `key_`. It is useful to store and use everywhere `"key_fireballSpell"` instead of `"Skyrim.esm|0x1C789"`.
 
 Example:
 
 ```json
 "FormIDs": {
-    // remember fireball spell and projectile  IDs for further using
+    // remember fireball spell and projectile IDs for further using
     "key_spellFireball": "Skyrim.esm|0x1C789",
     "key_projFireball": "Skyrim.esm|0x10FBED"
 }
@@ -81,14 +85,14 @@ Example:
 ...
 ```
 
-This is a map with [these](#keys-of-new-types) keys and json objects as values. Each object represent a homing projectile type.
+This is a map with [these](#keys-of-new-types) keys and json objects as values. Each object represents a homing projectile type.
 
-There are two implementations of trajectories (use `type` property).
+There are two implementations of trajectories (use `type` property for it).
 
 * `ConstSpeed` -- projectile has constant linear speed.  
-It is parametrized by `rotationTime` property. This is time needed to rotate at 180 deg (5, 3.5, 2.5 values are pretty nice).
+It is parametrized by `rotationTime` property. This is the time needed to rotate at 180 deg (5, 3.5, 2.5 values are pretty nice).
 * `ConstAccel` -- projectile has constant acceleration vector length.  
-It is parametrized by `acceleration` property. This is acceleration vector length (5, 10, 50 values are pretty nice).
+It is parametrized by `acceleration` property. This is the length of the acceleration vector (5, 10, 50 values are pretty nice).
 
 Example:
 
@@ -178,9 +182,9 @@ There could be multiple spawn groups, defined in object's `spawnData` array of j
 
 The object also has some default properties that are used if no such property is set in the spawn group:
 
-* `spellID` -- defines the spell will be casted for every projectile in the spawn group. It could be:
+* `spellID`, `weapID`, `ammoID` -- defines the spell (for casting spell) or weapon and ammo (for firing arrow) that will be emitted for every projectile in the spawn group. Ecactly one of (`spellID`, `weapID`) must present. If `weapID` is present, object also may have `ammoID` property. All properties could be:
   * `Current` -- (default) take projectile's spell itself.
-  * [FormID](#plugin-formid) or [Key](#formids) formIDs that should have SPEL record.
+  * [FormID](#plugin-formid) or [Key](#formids) formIDs that should have SPEL, WEAP or AMMO record.
 
 * `shape` -- define spawn shape. It could be:
   * `Single` -- (default) spawn all projectiles in a single spot.
@@ -201,7 +205,7 @@ The object also has some default properties that are used if no such property is
   * `Single` -- play sound once for a group.
   * `None` -- do not play sounds for the group.
 
-* `count` -- a number of projectiles to spawn in the group. Default: 1.
+* `count` -- a number of projectiles to spawn in the group. Default: 0.
 
 In addition to the above properties, spawn group have those:
 
@@ -211,6 +215,9 @@ In addition to the above properties, spawn group have those:
 * `normal` -- assume that the cast direction is along Y axis. Then this parameter defines cast direction for this spawn group. Default: [0,1,0], i.e. along Y axis too. It is not necessary to have it unitized.
 * `rotDelta` -- rotate launched projectile to this angles. Default: [0,0].
 * `rotRnd` -- maximal random angles offset. Default: [0,0].
+* `NewProjType` -- which new types created projectile could have. This is an object with these keys:
+  * `Emitter` -- key of emitter type
+  * `Homing` -- key of homing type
 
 ### Emitters
 
@@ -252,7 +259,8 @@ This is a map with keys from `0x01` to `0xFF` and json objects as values. Each o
 Emitter can call functions while flying. Use `interval` property to set calling interval and `type` property to set type of the function.  
 Available functions are:
 
-* Multicast -- perform multicast action. It uses `key` property to set the key of needed action. For this purpose "0xFFXXXXXX" used.
+* `Multicast` -- perform multicast action. It uses `key` property to set the key of needed action. For this purpose "0xFFXXXXXX" are used.
+* `ChangeType` -- change projectile type. It ises `NewProjType` property (see [Multicast](#multicast)). `0xFFFFFFFF` key disables according new type.
 
 ## Additional definitions
 

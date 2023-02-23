@@ -12,10 +12,7 @@ struct NewProjType
 };
 static_assert(sizeof(NewProjType) == 0x8);
 
-struct ProjectileRot
-{
-	float x, z;
-};
+using ProjectileRot = RE::Projectile::ProjectileRot;
 
 typedef void (*set_type_t)(RE::Projectile* proj);
 

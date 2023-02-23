@@ -94,9 +94,8 @@ static void SKSEMessageHandler(SKSE::MessagingInterface::Message* message)
 		InputHandler::GetSingleton()->enable();
 
 		PaddingsProjectileHook::Hook();
-		InitStartPosHook::Hook();
 		MultipleBeamsHook::Hook();
-		MultipleFlamesHook::Hook();
+		//MultipleFlamesHook::Hook();
 
 		if (Settings::NormLightingsEnabled)
 			NormLightingsHook::Hook();

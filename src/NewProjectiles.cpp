@@ -50,12 +50,12 @@ namespace Impl
 	{
 		void* vftable_LaunchData_0;
 		RE::NiPoint3 startPos;
-		RE::NiPoint3 Point_14;
+		RE::NiPoint3 contactNormal;
 		RE::BGSProjectile* projectile;
 		RE::TESObjectREFR* source;
 		RE::CombatController* combatController;
 		RE::TESObjectWEAP* weap;
-		RE::TESAmmo* overwriteAmmo;
+		RE::TESAmmo* ammoSource;
 		float rotationZ;
 		float rotationX;
 		void* field_50;
@@ -89,12 +89,12 @@ namespace Impl
 
 		ldata.vftable_LaunchData_0 = nullptr;  // TODO: mb used
 		ldata.startPos = startPos;
-		ldata.Point_14 = { 0.0f, 0.0f, 0.0f };
+		ldata.contactNormal = { 0.0f, 0.0f, 0.0f };
 		ldata.projectile = mgef->data.projectileBase;
 		ldata.source = a;
 		ldata.combatController = a->combatController;
 		ldata.weap = nullptr;
-		ldata.overwriteAmmo = nullptr;
+		ldata.ammoSource = nullptr;
 		ldata.rotationZ = rotationZ;
 		ldata.rotationX = rotationX;
 		ldata.field_50 = nullptr;
@@ -121,12 +121,12 @@ namespace Impl
 	{
 		ldata.vftable_LaunchData_0 = nullptr;  // TODO: mb used
 		ldata.startPos = startPos;
-		ldata.Point_14 = { 0.0f, 0.0f, 0.0f };
+		ldata.contactNormal = { 0.0f, 0.0f, 0.0f };
 		ldata.projectile = ammo->data.projectile;
 		ldata.source = a;
 		ldata.combatController = a->combatController;
 		ldata.weap = weap;
-		ldata.overwriteAmmo = ammo;
+		ldata.ammoSource = ammo;
 		ldata.rotationZ = rotationZ;
 		ldata.rotationX = rotationX;
 		ldata.field_50 = nullptr;
@@ -208,50 +208,46 @@ namespace Impl
 using Sounds::play_cast_sound;
 using Impl::cast;
 
-uint32_t cast_CustomPos(RE::Actor* caster, RE::SpellItem* spel,
+RE::ProjectileHandle cast_CustomPos(RE::Actor* caster, RE::SpellItem* spel,
 	const RE::NiPoint3& start_pos, const ProjectileRot& rot, bool withSound)
 {
-	auto handle = cast(caster, spel, start_pos, rot);
-
-	RE::TESObjectREFRPtr _refr;
-	RE::LookupReferenceByHandle(handle, _refr);
-	auto proj = _refr.get() ? _refr.get()->As<RE::Projectile>() : nullptr;
-	if (proj)
-	{
-		set_CustomPosType(proj);
-
-		if (withSound)
+	RE::ProjectileHandle handle;
+	RE::Projectile::LaunchSpell(&handle, caster, spel, start_pos, rot);
+	
+	if (withSound) {
+		if (auto proj = handle.get().get())
 			play_cast_sound(proj, spel, start_pos);
-
-		logger::info("{} {}", rot.x, rot.z);
 	}
 
 	return handle;
 }
 
-uint32_t cast_CustomPos(RE::Actor* caster, RE::TESAmmo* ammo,
+RE::ProjectileHandle cast_CustomPos(RE::Actor* caster, RE::TESAmmo* ammo,
 	RE::TESObjectWEAP* weap, const RE::NiPoint3& start_pos, const ProjectileRot& rot, bool withSound)
 {
-	auto handle = cast(caster, start_pos, rot, ammo, weap);
-
-	RE::TESObjectREFRPtr _refr;
-	RE::LookupReferenceByHandle(handle, _refr);
-	auto proj = _refr.get() ? _refr.get()->As<RE::Projectile>() : nullptr;
-	if (proj) {
-		set_CustomPosType(proj);
-		proj->power = 0.75f;
-	}
-
-	if (proj && withSound) {
-		//play_cast_sound(proj, spel, start_pos);
+	RE::ProjectileHandle handle;
+	RE::Projectile::LaunchArrow(&handle, caster, ammo, weap, start_pos, rot);
+	
+	if (withSound) {
+		if (auto proj = handle.get().get()) {
+			//play_cast_sound(proj, spel, start_pos);
+		}
 	}
 
 	return handle;
 }
 
-uint32_t cast_CustomPos_withsound(RE::Actor* caster, RE::SpellItem* spel, const RE::NiPoint3& start_pos, const ProjectileRot& rot)
+RE::ProjectileHandle cast_CustomPos_withsound(RE::Actor* caster, RE::SpellItem* spel, const RE::NiPoint3& start_pos,
+	const ProjectileRot& rot)
 {
 	return cast_CustomPos(caster, spel, start_pos, rot, true);
+}
+
+bool is_MyBeamType(RE::Projectile* proj)
+{
+	auto spell = proj->spell;
+	return spell && spell->GetCastingType() == RE::MagicSystem::CastingType::kFireAndForget && proj->IsBeamProjectile() &&
+	       proj->flags.all(RE::Projectile::Flags::kUseOrigin) && !proj->flags.any(RE::Projectile::Flags::kAutoAim);
 }
 
 uint32_t get_formid_fromhex(const std::string& name) {
@@ -310,26 +306,9 @@ extern "C"
 		return init_NormalType(proj);
 	}
 
-	DLLEXPORT void FenixProjectilesAPI_set_CustomPosType(RE::Projectile* proj)
-	{
-		return set_CustomPosType(proj);
-	}
-
 	DLLEXPORT uint32_t FenixProjectilesAPI_cast(RE::Actor* caster, RE::SpellItem* spel,
 		const RE::NiPoint3& start_pos, const ProjectileRot& rot)
 	{
 		return cast(caster, spel, start_pos, rot);
-	}
-
-	DLLEXPORT uint32_t FenixProjectilesAPI_cast_CustomPos(RE::Actor* caster,
-		RE::SpellItem* spel, const RE::NiPoint3& start_pos, const ProjectileRot& rot)
-	{
-		return cast_CustomPos(caster, spel, start_pos, rot);
-	}
-
-	DLLEXPORT uint32_t FenixProjectilesAPI_cast_CustomPos_withsound(RE::Actor* caster,
-		RE::SpellItem* spel, const RE::NiPoint3& start_pos, const ProjectileRot& rot)
-	{
-		return cast_CustomPos_withsound(caster, spel, start_pos, rot);
 	}
 }
