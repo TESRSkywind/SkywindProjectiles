@@ -548,18 +548,18 @@ namespace AutoAim
 				{
 					RE::NiPoint3 proj_dir = proj->linearVelocity;
 					proj_dir.Unitize();
-
+					
 					proj->data.angle.x = asin(proj_dir.z);
 					proj->data.angle.z = atan2(proj_dir.x, proj_dir.y);
-
+					
 					if (proj_dir.x < 0.0) {
-						proj->data.angle.z += 3.1415926f;
+						proj->data.angle.x += 3.1415926f;
 					}
-
+					
 					if (proj->data.angle.z < 0.0) {
 						proj->data.angle.z += 3.1415926f;
 					}
-
+					
 					SetRotationMatrix(proj->Get3D2()->local.rotate, proj_dir.x,
 						proj_dir.y, proj_dir.z);
 				}

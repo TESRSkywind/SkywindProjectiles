@@ -122,6 +122,10 @@
 				"type": "ConstAccel",
 				"acceleration": 70
     		},
+			"key_projFireball": {
+				"type": "ConstAccel",
+				"acceleration": 70
+    		},
 			"key_home": {
 				"type": "ConstSpeed",
 				"rotationTime": 1
@@ -132,14 +136,17 @@
     		}
 		},
 		"Multicast": {
-			"key_projArrowIron": {
+			"key_projArrowDaedr": {
 				"arrowID": "Current",
 				"weapID": "Current",
 				"spawnData": [
 					{
-						"count": 20,
-						"normal": [0,1,0],
-						"rotRnd": [0,20]
+						"count": 1,
+						"normal": [1,50,0]
+					},
+					{
+						"count": 1,
+						"normal": [-1,50,0]
 					}
 				]
 			},
@@ -209,7 +216,7 @@
 					}
 				]
 			},
-			"key_projFireball": {
+			"key_1": {
 				"spellID": "Current",
 				"spawnData": [
 					{
@@ -315,7 +322,7 @@
 			"key_projArrowEbony": {
 				"key": "0x03"
 			},
-			"key_projArrowDaedr": {
+			"key_projArrowIron": {
 				"key": "0x04"
 			},
 			"key_projArrowDwarv": {

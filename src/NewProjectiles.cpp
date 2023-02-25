@@ -227,9 +227,14 @@ RE::ProjectileHandle cast_CustomPos(RE::Actor* caster, RE::TESAmmo* ammo,
 {
 	RE::ProjectileHandle handle;
 	RE::Projectile::LaunchArrow(&handle, caster, ammo, weap, start_pos, rot);
-	
-	if (withSound) {
-		if (auto proj = handle.get().get()) {
+
+	if (auto proj = handle.get().get()) {
+		if (proj->power > 0) {
+			proj->weaponDamage /= proj->power;
+			proj->power = 0.75f;
+			proj->weaponDamage *= proj->power;
+		}
+		if (withSound) {
 			//play_cast_sound(proj, spel, start_pos);
 		}
 	}
