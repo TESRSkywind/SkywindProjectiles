@@ -363,8 +363,7 @@ namespace ManyProjs
 			bool withSound)
 		{
 			RE::NiPoint3 rnd_offset = Rotation::add_point_rnd(data.pos_rnd);
-			FenixUtils::rotate(rnd_offset,
-				{ cast_data.parallel_rot.x, 0, cast_data.parallel_rot.z });
+			rnd_offset = rotate(rnd_offset, { cast_data.parallel_rot.x, cast_data.parallel_rot.z }, data.bitdata.normalDependsX);
 
 			pos += rnd_offset;
 

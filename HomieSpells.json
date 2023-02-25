@@ -238,10 +238,11 @@
 					{
 						"count": 30,
 						"pos": [0,2000,3000],
-						"normal": [0,0,-1],
-						"rotRnd": [20,20],
+						"normal": [0,0.0001,-1],
 						"xDepends": false,
-						"posRnd": [500,500,2000]
+						"posRnd": [500,500,2000],
+						"rotation": "ToSight",
+						"rotRnd": [5,5]
 					}
 				]
 			},
