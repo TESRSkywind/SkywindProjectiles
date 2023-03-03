@@ -195,7 +195,7 @@ namespace Emitters
 				auto homing_key = new_types.homing;
 				if (homing_key != 0) {
 					if (homing_key == -1) {
-						AutoAim::Data::set_NormalType(proj);
+						AutoAim::Data::disable_AutoAim(proj);
 					} else {
 						AutoAim::onCreated(proj, homing_key);
 					}

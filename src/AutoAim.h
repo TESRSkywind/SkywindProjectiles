@@ -3,13 +3,12 @@
 #include "JsonUtils.h"
 
 // Stored in RuntimeData
-enum class AutoAimTypes : std::uint32_t
+enum class AutoAimTypes : uint32_t
 {
-	Normal = 0,
 	ConstSpeed = 1,
 	ConstAccel = 2
 };
-static constexpr AutoAimTypes AutoAimTypes__DEFAULT = AutoAimTypes::Normal;
+static constexpr AutoAimTypes AutoAimTypes__DEFAULT = AutoAimTypes::ConstSpeed;
 
 namespace AutoAim
 {
@@ -30,6 +29,6 @@ namespace AutoAim
 
 	namespace Data
 	{
-		void set_NormalType(RE::Projectile* proj);
+		void disable_AutoAim(RE::Projectile* proj);
 	}
 }

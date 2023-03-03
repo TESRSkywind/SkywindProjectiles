@@ -100,11 +100,21 @@ public:
 
 		_TESObjectREFR__SetPosition_140296910 =
 			trmpl.write_call<5>(REL::ID(42586).address() + 0x2db, UpdatePos);  // SkyrimSE.exe+733F9B
-		
 		_Projectile__SetRotation = trmpl.write_call<5>(REL::ID(42586).address() + 0x249, UpdateRot);  // SkyrimSE.exe+733F09
+		_matrix_mul = trmpl.write_call<5>(REL::ID(42586).address() + 0x212, matrix_mul);
 	}
 
 private:
+	static RE::NiMatrix3* matrix_mul(RE::NiMatrix3* A, RE::NiMatrix3* ans, RE::NiMatrix3* B) {
+		auto proj = (RE::Projectile*)((char*)A - 0xA8);
+		if (is_MyBeamType(proj)) {
+			auto node = proj->Get3D2();
+			return &node->local.rotate;
+		} else {
+			return _matrix_mul(A, ans, B);
+		}
+	}
+
 	static bool NewBeam(uint32_t* handle, RE::Projectile** proj)
 	{
 		auto found = _RefHandle__get(handle, proj);
@@ -142,6 +152,7 @@ private:
 	static inline REL::Relocation<decltype(NewBeam)> _RefHandle__get;
 	static inline REL::Relocation<decltype(UpdatePos)> _TESObjectREFR__SetPosition_140296910;
 	static inline REL::Relocation<decltype(UpdateRot)> _Projectile__SetRotation;
+	static inline REL::Relocation<decltype(matrix_mul)> _matrix_mul;
 };
 /*
 class MultipleFlamesHook

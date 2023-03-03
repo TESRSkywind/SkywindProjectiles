@@ -47,12 +47,12 @@ namespace AutoAim
 					detection_angle = detection_angle_t::f2u(val);
 				}
 
-				float get_detectionAngle()
+				float get_detectionAngle() const
 				{
 					return detection_angle_t::u2f(detection_angle);
 				}
 
-				float get_accOrRottime(AutoAimTypes type)
+				float get_accOrRottime(AutoAimTypes type) const
 				{
 					float ans = acc_or_rottime_t::u2f(acc_or_rottime);
 					if (type == AutoAimTypes::ConstAccel)
@@ -142,17 +142,17 @@ namespace AutoAim
 			}
 
 			// Lookup both maps or return default entry
-			static std::pair<AutoAimTypes, JsonDataItem> query(uint32_t key)
+			static std::tuple<bool, AutoAimTypes, JsonDataItem> query(uint32_t key)
 			{
 				if (auto found = query_map(ConstAccel, key); found != ConstAccel.end()) {
-					return { AutoAimTypes::ConstAccel, (*found).second };
+					return { true, AutoAimTypes::ConstAccel, (*found).second };
 				}
 
 				if (auto found = query_map(ConstSpeed, key); found != ConstSpeed.end()) {
-					return { AutoAimTypes::ConstSpeed, (*found).second };
+					return { true, AutoAimTypes::ConstSpeed, (*found).second };
 				}
 
-				return { AutoAimTypes::Normal, JsonDataItem__DEFAULT };
+				return { false, AutoAimTypes::ConstAccel, JsonDataItem__DEFAULT };
 			}
 		};
 
@@ -160,24 +160,27 @@ namespace AutoAim
 		void set_AutoAimType(RE::Projectile* proj, AutoAimTypes type,
 			float acc_or_speed)
 		{
-			get_runtime_data(proj).set_AutoAim(type);
+			get_runtime_data(proj).enable_AutoAim();
+			get_runtime_data(proj).set_AutoAimType(type);
 			get_runtime_data(proj).set_AutoAimParam(acc_or_speed);
 		}
 
-		void set_NormalType(RE::Projectile* proj)
+		void disable_AutoAim(RE::Projectile* proj)
 		{
-			return set_AutoAimType(proj, AutoAimTypes::Normal, 0);
+			get_runtime_data(proj).disable_AutoAim();
 		}
 
-		// 3rd is acc_or_rottime
+		// 4rd is acc_or_rottime
 		auto get_onCreate_data(uint32_t key)
 		{
-			std::tuple<AutoAimTypes, AutoAimCaster, float> ans;
+			std::tuple<bool, AutoAimTypes, AutoAimCaster, float> ans;
 
 			auto data = JsonStorage::query(key);
-			std::get<AutoAimTypes>(ans) = data.first;
-			std::get<AutoAimCaster>(ans) = data.second.caster;
-			std::get<float>(ans) = data.second.get_accOrRottime(data.first);
+			std::get<bool>(ans) = std::get<bool>(data);
+			std::get<AutoAimTypes>(ans) = std::get<AutoAimTypes>(data);
+			const auto& json_data = std::get<JsonStorage::JsonDataItem>(data);
+			std::get<AutoAimCaster>(ans) = json_data.caster;
+			std::get<float>(ans) = json_data.get_accOrRottime(std::get<AutoAimTypes>(data));
 
 			return ans;
 		}
@@ -188,15 +191,16 @@ namespace AutoAim
 			std::tuple<AutoAimTarget, float> ans;
 
 			auto data = JsonStorage::query(bproj->formID);
-			std::get<AutoAimTarget>(ans) = data.second.target;
-			std::get<float>(ans) = data.second.get_detectionAngle();
+			const auto& json_data = std::get<JsonStorage::JsonDataItem>(data);
+			std::get<AutoAimTarget>(ans) = json_data.target;
+			std::get<float>(ans) = json_data.get_detectionAngle();
 
 			return ans;
 		}
 
 		AutoAimTypes get_AutoAimType(RE::Projectile* proj)
 		{
-			return get_runtime_data(proj).autoAimType();
+			return get_runtime_data(proj).get_autoAimType();
 		}
 
 		auto get_AutoAimParam(RE::Projectile* proj)
@@ -517,11 +521,8 @@ namespace AutoAim
 
 		void change_direction(RE::Projectile* proj, RE::NiPoint3*, float dtime)
 		{
-			if (auto target = Targeting::findTarget(proj)) {
-				RE::NiPoint3 final_vel;
-				if (!get_shoot_dir(proj, target, dtime, final_vel))
-					return AutoAim::Data::set_NormalType(proj);
-
+			RE::NiPoint3 final_vel;
+			if (auto target = Targeting::findTarget(proj); target && get_shoot_dir(proj, target, dtime, final_vel)) {
 				auto type = Data::get_AutoAimType(proj);
 				auto param = Data::get_AutoAimParam(proj);
 				switch (type) {
@@ -539,8 +540,7 @@ namespace AutoAim
 				{
 					auto proj_dir = proj->linearVelocity;
 					proj_dir.Unitize();
-					draw_line<Colors::RED>(proj->GetPosition(),
-						proj->GetPosition() + proj_dir);
+					draw_line<Colors::RED>(proj->GetPosition(), proj->GetPosition() + proj_dir);
 				}
 #endif  // DEBUG
 
@@ -548,23 +548,22 @@ namespace AutoAim
 				{
 					RE::NiPoint3 proj_dir = proj->linearVelocity;
 					proj_dir.Unitize();
-					
+
 					proj->data.angle.x = asin(proj_dir.z);
 					proj->data.angle.z = atan2(proj_dir.x, proj_dir.y);
-					
+
 					if (proj_dir.x < 0.0) {
 						proj->data.angle.x += 3.1415926f;
 					}
-					
+
 					if (proj->data.angle.z < 0.0) {
 						proj->data.angle.z += 3.1415926f;
 					}
-					
-					SetRotationMatrix(proj->Get3D2()->local.rotate, proj_dir.x,
-						proj_dir.y, proj_dir.z);
+
+					SetRotationMatrix(proj->Get3D2()->local.rotate, proj_dir.x, proj_dir.y, proj_dir.z);
 				}
 			} else {
-				AutoAim::Data::set_NormalType(proj);
+				AutoAim::Data::disable_AutoAim(proj);
 			}
 		}
 	}
@@ -705,7 +704,7 @@ namespace AutoAim
 	void onCreated(RE::Projectile* proj, uint32_t key)
 	{
 		if (auto data = get_onCreate_data(key);
-			std::get<AutoAimTypes>(data) != AutoAimTypes::Normal) {
+			std::get<bool>(data)) {
 			if (auto caster = proj->shooter.get().get()) {
 				bool isPlayer = caster->IsPlayerRef();
 				auto caster_type = std::get<AutoAimCaster>(data);
