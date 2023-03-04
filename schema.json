@@ -167,6 +167,21 @@
       "additionalProperties": false
     },
 
+    "ifMulticastAutoAim": {
+      "$comment": "Add target type",
+      "if": {
+        "properties": {
+          "rotation": { "const": "AutoAim" }
+        },
+        "required": ["rotation"]
+      },
+      "then": {
+        "properties": {
+          "target": { "$ref": "#/$defs/HomingTargets" }
+        },
+        "required": ["target"]
+      }
+    },
     "MulticastEmpty": {
       "allOf": [
         { "not": { "required": ["arrowID"] } },
@@ -215,7 +230,7 @@
     },
     "MultiCastRotation": {
       "description": "How to rotate projectiles (default: Parallel)",
-      "enum": ["Parallel", "ToSight", "ToCenter", "FromCenter"]
+      "enum": ["Parallel", "ToSight", "ToCenter", "FromCenter", "AutoAim"]
     },
     "MultiCastSound": {
       "description": "How many times play sound for a group (default: Every)",
@@ -333,6 +348,10 @@
         { "$ref": "#/$defs/MulticastArrow" },
         { "$ref": "#/$defs/MulticastSpell" }
       ],
+      "allOf": [
+        { "$ref": "#/$defs/ifMulticastAutoAim" },
+        { "$ref": "#/$defs/ifAutoAimCursor" }
+      ],
       "required": ["spawnData"],
       "unevaluatedProperties": false
     },
@@ -390,7 +409,7 @@
           "maximum": 20
         },
         "type": {
-          "enum": ["Multicast", "ChangeType"],
+          "enum": ["Multicast", "ChangeType", "Fire"],
           "description": "A function to call"
         }
       },
@@ -422,14 +441,6 @@
       "description": "Configure emitter spells"
     },
 
-
-
-
-
-
-
-
-    
     "FollowingShape": {
       "description": "Shape & behavior of Following projectile",
       "enum": ["Nimbus", "Shield", "Round"]
@@ -461,16 +472,6 @@
       "additionalProperties": false,
       "description": "Configure emitter spells"
     },
-
-
-
-
-
-
-
-
-
-
 
     "ModConfig": {
       "type": "object",

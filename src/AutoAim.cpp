@@ -21,7 +21,7 @@ namespace AutoAim
 		class JsonStorage
 		{
 		public:
-			using detection_angle_t = CustomFloat<4, 3>;
+			using detection_angle_t = Targeting::detection_angle_t;
 			using acc_or_rottime_t = FenixProjsRuntimeData::AutoAimParam_t;
 
 			// Stored in Json (in 2 maps), queried only at creation
@@ -34,8 +34,6 @@ namespace AutoAim
 				uint32_t unused: 14;                                   // 0:12
 
 				void set_detectionAngle(float val) { detection_angle = detection_angle_t::f2u(val); }
-
-				float get_detectionAngle() const { return detection_angle_t::u2f(detection_angle); }
 
 				float get_accOrRottime(AutoAimTypes type) const
 				{
@@ -70,13 +68,10 @@ namespace AutoAim
 			static void read_json_entry(const Json::Value& item, uint32_t formid)
 			{
 				JsonDataItem data;
-				data.caster =
-					parse_enum_ifIsMember<AutoAimCaster__DEFAULT>(item, "caster"sv);
-				data.target = Targeting::Data::read_json_entry(item);
+				data.caster = parse_enum_ifIsMember<AutoAimCaster__DEFAULT>(item, "caster"sv);
 
-				data.set_detectionAngle(data.target == AimTargetType::Cursor ?
-											item["cursorAngle"].asFloat() :
-											0.0f);
+				data.target = Targeting::Data::read_json_entry(item);
+				data.detection_angle = Targeting::Data::read_detectionAngle(item, data.target);
 
 				auto type = parse_enum<AutoAimTypes__DEFAULT>(item["type"].asString());
 
@@ -177,7 +172,7 @@ namespace AutoAim
 			auto data = JsonStorage::query(bproj->formID);
 			const auto& json_data = std::get<JsonStorage::JsonDataItem>(data);
 			std::get<AimTargetType>(ans) = json_data.target;
-			std::get<float>(ans) = json_data.get_detectionAngle();
+			std::get<float>(ans) = Targeting::Data::get_detectionAngle(json_data.detection_angle);
 
 			return ans;
 		}
@@ -197,16 +192,6 @@ namespace AutoAim
 			return _generic_foo_<42958, decltype(get_proj_speed)>::eval(proj);
 		}
 
-		RE::NiPoint3 get_victim_pos(RE::Actor* target, float dtime)
-		{
-			RE::NiPoint3 ans, eye_pos;
-			target->GetLinearVelocity(ans);
-			ans *= dtime;
-			FenixUtils::Actor__get_eye_pos(target, eye_pos, 3);
-			ans += eye_pos;
-			return ans;
-		}
-
 		bool get_shoot_dir(RE::Projectile* proj, RE::Actor* target, float dtime,
 			RE::NiPoint3& ans)
 		{
@@ -216,7 +201,7 @@ namespace AutoAim
 
 			double proj_speed = get_proj_speed(proj);
 
-			auto target_pos = get_victim_pos(target, dtime);
+			auto target_pos = Targeting::get_victim_pos(target, dtime);
 			auto strait_dir = target_pos - proj->GetPosition();
 
 			double a = proj_speed * proj_speed - target_speed * target_speed;
@@ -533,7 +518,7 @@ namespace AutoAim
 						auto target_data = get_findTarget_data(proj->GetBaseObject());
 						if (auto target = Targeting::findTarget(proj, target_data)) {
 							auto dir = rot_at(proj->GetPosition(),
-								Moving::get_victim_pos(target, 0));
+								Targeting::get_victim_pos(target));
 
 							_generic_foo_<19362, void(RE::TESObjectREFR * refr,
 													 float rot_Z)>::eval(proj, dir.z);

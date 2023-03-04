@@ -3,6 +3,7 @@
 #include "AutoAim.h"
 #include "Emittors.h"
 #include "Following.h"
+#include "Targeting.h"
 
 namespace ManyProjs
 {
@@ -28,6 +29,7 @@ namespace ManyProjs
 		ToSight,
 		ToCenter,
 		FromCenter,
+		AutoAim,
 
 		Total
 	};
@@ -46,21 +48,27 @@ namespace ManyProjs
 
 	namespace Data
 	{
+		using Targeting::AimTargetType;
+		using Targeting::detection_angle_t;
+
 		class JsonStorage
 		{
+
 		public:
 			// A part of JsonDataItem
 			struct BitData
 			{
-				uint32_t normalDependsX: 1;  // 0:00
-				LaunchDir rot: 3;            // 0:01 -- default
-				SoundType sound: 2;          // 0:04 -- default
-				Shape shape: 3;              // 0:06 -- default
-				uint32_t count: 8;           // 0:09 -- default
-				uint32_t
-					size: 15;  // 0:11 -- shape not Single. Do not checked in json schema
+				uint32_t normalDependsX: 1;                            // 0:00
+				LaunchDir rot: 3;                                      // 0:01 -- default
+				SoundType sound: 2;                                    // 0:04 -- default
+				Shape shape: 3;                                        // 0:06 -- default
+				uint32_t count: 8;                                     // 0:09 -- default
+				uint32_t size: 15;                                     // 0:11 -- shape not Single. Do not checked in json schema
+				AimTargetType target: 2;                               // 1:00
+				uint32_t detection_angle : detection_angle_t::SIZEOF;  // 1:02 - for cursor target (0..90)
+				uint32_t unused: 23;								   // 1:09
 			};
-			static_assert(sizeof(BitData) == 0x4);
+			static_assert(sizeof(BitData) == 0x8);
 
 			struct SpellData
 			{
@@ -76,16 +84,16 @@ namespace ManyProjs
 			// Stored in Json, queried only at creation
 			struct JsonDataItem
 			{
-				ProjectileRot rot_rnd;                    // 00
-				ProjectileRot rot_delta;                  // 08 -- rot Parallel
-				RE::NiPoint3 pos;                         // 10
-				RE::NiPoint3 pos_rnd;                     // 1C
-				RE::NiPoint3 normal;                      // 28
-				BitData bitdata;                          // 34
-				std::variant<SpellData, ArrowData> data;  // 38
-				NewProjType newtypes;                     // 44
+				ProjectileRot rot_rnd;                                 // 00
+				ProjectileRot rot_delta;                               // 08 -- rot Parallel
+				BitData bitdata;                                       // 10
+				RE::NiPoint3 pos;                                      // 18
+				RE::NiPoint3 pos_rnd;                                  // 24
+				RE::NiPoint3 normal;                                   // 30
+				std::variant<SpellData, ArrowData> data;               //
+				NewProjType newtypes;                                  //
 			};
-			static_assert(sizeof(JsonDataItem) == 0x50);
+			static_assert(sizeof(JsonDataItem) == 0x54);
 
 		private:
 			struct MapEntry
@@ -134,6 +142,11 @@ namespace ManyProjs
 					}
 				} else {
 					data.data = SpellData{};
+				}
+
+				if (data.bitdata.rot == LaunchDir::AutoAim) {
+					data.bitdata.target = Targeting::Data::read_json_entry(item);
+					data.bitdata.detection_angle = Targeting::Data::read_detectionAngle(item, data.bitdata.target);
 				}
 
 				data.newtypes.init(item);
@@ -316,6 +329,12 @@ namespace ManyProjs
 				return RE::NiPoint3{ rnd.x * random_range(-1.0f, 1.0f),
 					rnd.y * random_range(-1.0f, 1.0f),
 					rnd.z * random_range(-1.0f, 1.0f) };
+			}
+
+			auto find_target(RE::TESObjectREFR* origin, Targeting::AimTargetType type, float angle)
+			{
+				auto target = Targeting::findTarget(origin, { type, angle });
+				return target ? Targeting::get_victim_pos(target) : origin->GetPosition() + RE::NiPoint3{ 0, 1, 0 };
 			}
 
 			// get point `caster` is looking at
@@ -584,13 +603,34 @@ namespace ManyProjs
 				{ spawn_center, right_dir, up_dir });
 
 			RE::NiPoint3 arg_point;
-			if (rot == LaunchDir::Parallel)
+			switch (rot) {
+			case ManyProjs::LaunchDir::Parallel:
 				arg_point = cast_dir;
-			else if (rot != LaunchDir::ToSight)
-				arg_point = spawn_center;
-			else
+				break;
+			case ManyProjs::LaunchDir::ToSight:
 				arg_point = Rotation::raycast(cast_data.caster);
-
+				break;
+			case ManyProjs::LaunchDir::AutoAim:
+				{
+					using Targeting::AimTargetType;
+					auto target_type =
+						read_default<AimTargetType::Total, AimTargetType::Nearest>(data.bitdata.target, data_def.bitdata.target);
+					float angle = 0;
+					if (target_type == AimTargetType::Cursor) {
+						uint32_t _angle = read_default<(uint32_t)0, (uint32_t)0>(data.bitdata.detection_angle,
+							data_def.bitdata.detection_angle);
+						angle = Targeting::Data::get_detectionAngle(_angle);
+					}
+					arg_point = Rotation::find_target(cast_data.caster, target_type, angle);
+				}
+				break;
+			case ManyProjs::LaunchDir::ToCenter:
+			case ManyProjs::LaunchDir::FromCenter:
+			default:
+				arg_point = spawn_center;
+				break;
+			}
+			
 			const get_rot_t get_rot = [rot, &arg_point](const RE::NiPoint3& cur_pos) {
 				ProjectileRot new_rot;
 				switch (rot) {
@@ -600,6 +640,7 @@ namespace ManyProjs
 				case LaunchDir::ToCenter:
 					new_rot = Rotation::rot_at(cur_pos, arg_point);
 					break;
+				case LaunchDir::AutoAim:
 				case LaunchDir::ToSight:
 					new_rot = Rotation::rot_at(cur_pos, arg_point);
 					break;

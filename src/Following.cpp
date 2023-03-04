@@ -134,11 +134,8 @@ namespace Following
 			a_matrix.entry[2][2] = cb;
 		}
 
-		void update_node_rotation(RE::Projectile* proj)
+		void update_node_rotation(RE::Projectile* proj, RE::NiPoint3 proj_dir)
 		{
-			RE::NiPoint3 proj_dir = proj->linearVelocity;
-			proj_dir.Unitize();
-
 			proj->data.angle.x = asin(proj_dir.z);
 			proj->data.angle.z = atan2(proj_dir.x, proj_dir.y);
 
@@ -207,13 +204,20 @@ namespace Following
 		{
 			change_direction_linVel(proj, dtime);
 
-			update_node_rotation(proj);
+			RE::NiPoint3 proj_dir;
+			if (proj->linearVelocity.SqrLength() > 30.0f) {
+				proj_dir = proj->linearVelocity;
+			} else {
+				proj_dir = FenixUtils::rotate(1, proj->shooter.get().get()->data.angle);
+			}
+			proj_dir.Unitize();
+			update_node_rotation(proj, proj_dir);
 
 #ifdef DEBUG
 			{
-				auto proj_dir = proj->linearVelocity;
-				proj_dir.Unitize();
-				draw_line<Colors::RED>(proj->GetPosition(), proj->GetPosition() + proj_dir);
+				auto _proj_dir = proj->linearVelocity;
+				_proj_dir.Unitize();
+				draw_line<Colors::RED>(proj->GetPosition(), proj->GetPosition() + _proj_dir);
 			}
 #endif  // DEBUG
 		}
@@ -297,7 +301,7 @@ namespace Following
 						uint32_t size = std::get<2>(data);
 						//uint32_t index = std::get<3>(data);
 						//uint32_t index = get_min_unused_index_ofType(proj);
-						uint32_t index = ind == -1 ? std::get<3>(data) : ind;
+						uint32_t index = ind == -1 ? std::get<3>(data) : ind + std::get<3>(data);
 						if (index < size)
 							Data::set_FollowType(proj, FollowTypes::Nimbus, size, index);
 					}
