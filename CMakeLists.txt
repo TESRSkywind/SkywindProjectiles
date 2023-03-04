@@ -93,6 +93,8 @@ set(SOURCES
 	src/PCH.h
 	src/AutoAim.h
 	src/AutoAim.cpp
+	src/Following.h
+	src/Following.cpp
 	src/Multicast.h
 	src/Multicast.cpp
 	src/Emittors.h

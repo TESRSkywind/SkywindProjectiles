@@ -48,6 +48,7 @@ extern "C" DLLEXPORT bool SKSEAPI SKSEPlugin_Query(const SKSE::QueryInterface* a
 #include "Hooks.h"
 #include "Settings.h"
 #include "AutoAim.h"
+#include "Following.h"
 #include "Multicast.h"
 #include "Emittors.h"
 
@@ -103,6 +104,7 @@ static void SKSEMessageHandler(SKSE::MessagingInterface::Message* message)
 		SetNewTypeHook::Hook();
 
 		AutoAim::install();
+		Following::install();
 		ManyProjs::install();
 		Emitters::install();
 

@@ -39,10 +39,8 @@
       "additionalProperties": false
     },
 
-
-
     "point3": {
-      "type":"array",
+      "type": "array",
       "items": {
         "type": "number"
       },
@@ -50,14 +48,13 @@
       "maxItems": 3
     },
     "point2": {
-      "type":"array",
+      "type": "array",
       "items": {
         "type": "number"
       },
       "minItems": 2,
       "maxItems": 2
     },
-
 
     "FormOrID": {
       "oneOf": [
@@ -71,9 +68,6 @@
       "type": "string",
       "pattern": "^0x[0-9a-fA-F]{1,8}$"
     },
-
-
-
 
     "ifAutoAimConstSpeed": {
       "$comment": "RotationTime for ConstSpeed type",
@@ -138,88 +132,94 @@
 
     "HomingTypes": {
       "description": "Type of homing trajectories",
-      "enum": [ "ConstSpeed", "ConstAccel" ]
+      "enum": ["ConstSpeed", "ConstAccel"]
     },
     "HomingCasters": {
       "description": "Who can cast homing version of the projectile (Default: both)",
-      "enum": [ "Both", "NPC", "Player" ]
+      "enum": ["Both", "NPC", "Player"]
     },
     "HomingTargets": {
       "description": "How to capture target (Default: Nearest)",
-      "enum": [ "Cursor", "Nearest", "Hostile" ]
+      "enum": ["Cursor", "Nearest", "Hostile"]
     },
     "Homing": {
       "description": "Configure homing spells",
       "type": "object",
-      "patternProperties": { "^0x[0-9a-fA-F]{1,8}$|^(key_)": {
-        "type": "object",
-        "properties": {
-          "type": { "$ref": "#/$defs/HomingTypes" },
-          "target": { "$ref": "#/$defs/HomingTargets" },
-          "caster": { "$ref": "#/$defs/HomingCasters" }
-        },
-        "allOf": [
-          { "$ref": "#/$defs/ifAutoAimConstSpeed" },
-          { "$ref": "#/$defs/ifAutoAimConstAccel" },
-          { "$ref": "#/$defs/ifAutoAimCursor" }
-        ],
-      
-        "required": [ "type" ],
-        "unevaluatedProperties": false
-      } },
-      
+      "patternProperties": {
+        "^0x[0-9a-fA-F]{1,8}$|^(key_)": {
+          "type": "object",
+          "properties": {
+            "type": { "$ref": "#/$defs/HomingTypes" },
+            "target": { "$ref": "#/$defs/HomingTargets" },
+            "caster": { "$ref": "#/$defs/HomingCasters" }
+          },
+          "allOf": [
+            { "$ref": "#/$defs/ifAutoAimConstSpeed" },
+            { "$ref": "#/$defs/ifAutoAimConstAccel" },
+            { "$ref": "#/$defs/ifAutoAimCursor" }
+          ],
+
+          "required": ["type"],
+          "unevaluatedProperties": false
+        }
+      },
+
       "additionalProperties": false
     },
 
-
-
-
-
-
-
     "MulticastEmpty": {
       "allOf": [
-        {"not": {"required": ["arrowID"]}},
-        {"not": {"required": ["spellID"]}},
-        {"not": {"required": ["weapID"]}}
+        { "not": { "required": ["arrowID"] } },
+        { "not": { "required": ["spellID"] } },
+        { "not": { "required": ["weapID"] } }
       ],
       "description": "Fallback to defaults"
     },
     "SpellID": {
-      "oneOf": [ { "$ref": "#/$defs/FormOrID" }, { "const": "Current" } ], "description": "A spell to cast"
+      "oneOf": [{ "$ref": "#/$defs/FormOrID" }, { "const": "Current" }],
+      "description": "A spell to cast"
     },
     "MulticastSpell": {
       "allOf": [
-        {"required": ["spellID"]},
-        {"not": {"required": ["arrowID"]}},
-        {"not": {"required": ["weapID"]}}
+        { "required": ["spellID"] },
+        { "not": { "required": ["arrowID"] } },
+        { "not": { "required": ["weapID"] } }
       ],
       "description": "Data dor spell projectile"
     },
     "ArrowID": {
-      "oneOf": [ { "$ref": "#/$defs/FormOrID" }, { "const": "Current" } ], "description": "An arrow to fire"
+      "oneOf": [{ "$ref": "#/$defs/FormOrID" }, { "const": "Current" }],
+      "description": "An arrow to fire"
     },
     "WeapID": {
-      "oneOf": [ { "$ref": "#/$defs/FormOrID" }, { "const": "Current" } ], "description": "A weap that fires"
+      "oneOf": [{ "$ref": "#/$defs/FormOrID" }, { "const": "Current" }],
+      "description": "A weap that fires"
     },
     "MulticastArrow": {
       "description": "Data dor spell projectile",
       "allOf": [
-        {"required": ["weapID"]},
-        {"not": {"required": ["spellID"]}}
+        { "required": ["weapID"] },
+        { "not": { "required": ["spellID"] } }
       ]
     },
     "MultiCastShape": {
       "description": "How to position projectiles (default: Single)",
-      "enum": [ "Single", "HorizontalLine", "VerticalLine", "Circle", "HalfCircle", "FillSquare" ]
+      "enum": [
+        "Single",
+        "HorizontalLine",
+        "VerticalLine",
+        "Circle",
+        "HalfCircle",
+        "FillSquare"
+      ]
     },
     "MultiCastRotation": {
       "description": "How to rotate projectiles (default: Parallel)",
-      "enum": [ "Parallel", "ToSight", "ToCenter", "FromCenter" ]
+      "enum": ["Parallel", "ToSight", "ToCenter", "FromCenter"]
     },
     "MultiCastSound": {
       "description": "How many times play sound for a group (default: Every)",
-      "enum": [ "Single", "Every", "None" ]
+      "enum": ["Single", "Every", "None"]
     },
     "Count": {
       "description": "Number of projectiles to spawn",
@@ -230,8 +230,14 @@
       "type": "object",
       "description": "Should new projectile be new type (homing, emitter etc)",
       "properties": {
-        "Emitter": { "$ref": "#/$defs/FormOrID", "description": "Set th projectile to emitter with this key" },
-        "Homing": { "$ref": "#/$defs/FormOrID", "description": "Set th projectile to homing with this key" }
+        "Emitter": {
+          "$ref": "#/$defs/FormOrID",
+          "description": "Set th projectile to emitter with this key"
+        },
+        "Homing": {
+          "$ref": "#/$defs/FormOrID",
+          "description": "Set th projectile to homing with this key"
+        }
       },
       "additionalProperties": false
     },
@@ -256,16 +262,31 @@
             "type": "object",
             "description": "Spawn group data",
             "properties": {
-              "rotRnd": { "$ref": "#/$defs/point2", "description": "Max delta for random angles" },
-              "rotDelta": { "$ref": "#/$defs/point2", "description": "Delta for angles" },
-              "pos": { "$ref": "#/$defs/point3", "description": "Origin center" },
-              "posRnd": { "$ref": "#/$defs/point3", "description": "Max delta for random origin" },
+              "rotRnd": {
+                "$ref": "#/$defs/point2",
+                "description": "Max delta for random angles"
+              },
+              "rotDelta": {
+                "$ref": "#/$defs/point2",
+                "description": "Delta for angles"
+              },
+              "pos": {
+                "$ref": "#/$defs/point3",
+                "description": "Origin center"
+              },
+              "posRnd": {
+                "$ref": "#/$defs/point3",
+                "description": "Max delta for random origin"
+              },
               "rotation": { "$ref": "#/$defs/MultiCastRotation" },
               "sound": { "$ref": "#/$defs/MultiCastSound" },
               "shape": { "$ref": "#/$defs/MultiCastShape" },
               "NewProjType": { "$ref": "#/$defs/NewProjType" },
               "count": { "$ref": "#/$defs/Count" },
-              "normal": { "$ref": "#/$defs/point3", "description": "Normal of the spawning plane" },
+              "normal": {
+                "$ref": "#/$defs/point3",
+                "description": "Normal of the spawning plane"
+              },
               "size": {
                 "type": "integer",
                 "description": "Shape size (usually 50--200). If shape is not Single, MUST present",
@@ -282,7 +303,7 @@
                   "properties": {
                     "normal": true
                   },
-                  "required": [ "normal" ]
+                  "required": ["normal"]
                 },
                 "then": {
                   "properties": {
@@ -308,18 +329,17 @@
         { "$ref": "#/$defs/MulticastArrow" },
         { "$ref": "#/$defs/MulticastSpell" }
       ],
-      "required": [ "spawnData" ],
+      "required": ["spawnData"],
       "unevaluatedProperties": false
-      
     },
     "Multicast": {
       "type": "object",
-      "patternProperties": { "^0x[0-9a-fA-F]{1,8}$|^(key_)": { "$ref": "#/$defs/MulticastData" } },
+      "patternProperties": {
+        "^0x[0-9a-fA-F]{1,8}$|^(key_)": { "$ref": "#/$defs/MulticastData" }
+      },
       "additionalProperties": false,
       "description": "Configure multicast spells"
     },
-
-
 
     "ifEmittersMulticastType": {
       "$comment": "Key for Multicast emitter",
@@ -366,7 +386,7 @@
           "maximum": 20
         },
         "type": {
-          "enum": [ "Multicast", "ChangeType" ],
+          "enum": ["Multicast", "ChangeType"],
           "description": "A function to call"
         }
       },
@@ -374,25 +394,75 @@
         { "$ref": "#/$defs/ifEmittersMulticastType" },
         { "$ref": "#/$defs/ifEmittersChangeTypeType" }
       ],
-      "required": [ "type", "interval" ],
+      "required": ["type", "interval"],
       "unevaluatedProperties": false
     },
     "Emitters": {
       "type": "object",
-      "patternProperties": { "^0x[0-9a-fA-F]{1,8}$|^(key_)": {
-        "type": "object",
-        "properties": { "key": {
-          "type": "string",
-          "pattern": "^0x[a-fA-F0-9]{1,2}$",
-          "description": "A key for global map"
-        } },
-        "required": ["key"],
-        "additionalProperties": false,
-        "description": "Set emitter type for this projectile"
-      } },
+      "patternProperties": {
+        "^0x[0-9a-fA-F]{1,8}$|^(key_)": {
+          "type": "object",
+          "properties": {
+            "key": {
+              "type": "string",
+              "pattern": "^0x[a-fA-F0-9]{1,2}$",
+              "description": "A key for global map"
+            }
+          },
+          "required": ["key"],
+          "additionalProperties": false,
+          "description": "Set emitter type for this projectile"
+        }
+      },
       "additionalProperties": false,
       "description": "Configure emitter spells"
     },
+
+
+
+
+
+
+
+
+    
+    "FollowingShape": {
+      "description": "Shape & behavior of Following projectile",
+      "enum": ["Nimbus", "Shield", "Round"]
+    },
+    "Following": {
+      "type": "object",
+      "patternProperties": {
+        "^0x[0-9a-fA-F]{1,8}$|^(key_)": {
+          "type": "object",
+          "properties": {
+            "size": {
+              "type": "integer",
+              "description": "A number of projectiles in this shape",
+              "maximum": 8
+            },
+            "index": {
+              "type": "integer",
+              "description": "Index of this projectile in this shape. From 0 to 'size-1'",
+              "maximum": 7
+            },
+            "type": { "$ref": "#/$defs/FollowingShape" },
+            "caster": { "$ref": "#/$defs/HomingCasters" }
+          },
+          "required": ["size", "index", "type"],
+          "additionalProperties": false,
+          "description": "Set following type for this projectile"
+        }
+      },
+      "additionalProperties": false,
+      "description": "Configure emitter spells"
+    },
+
+
+
+
+
+
 
 
 
@@ -404,7 +474,8 @@
       "properties": {
         "Homing": { "$ref": "#/$defs/Homing" },
         "Multicast": { "$ref": "#/$defs/Multicast" },
-        "Emitters": { "$ref": "#/$defs/Emitters" }
+        "Emitters": { "$ref": "#/$defs/Emitters" },
+        "Following": { "$ref": "#/$defs/Following" }
       },
       "additionalProperties": false
     }

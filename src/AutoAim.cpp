@@ -81,7 +81,7 @@ namespace AutoAim
 			static inline Map_t ConstSpeed;  // Const Speed
 			static inline Map_t ConstAccel;  // Const Acceleration
 
-			// init JsonDataItem entry and insert it to according map
+			// init JsonDataItem entry and insert it to the according map
 			static void read_json_entry(const Json::Value& item, uint32_t formid)
 			{
 				JsonDataItem data;
@@ -198,20 +198,9 @@ namespace AutoAim
 			return ans;
 		}
 
-		AutoAimTypes get_AutoAimType(RE::Projectile* proj)
-		{
-			return get_runtime_data(proj).get_autoAimType();
-		}
-
-		auto get_AutoAimParam(RE::Projectile* proj)
-		{
-			return get_runtime_data(proj).get_AutoAimParam();
-		}
-
-		static bool is_AutoAimType(RE::Projectile* proj)
-		{
-			return get_runtime_data(proj).isAutoAim();
-		}
+		AutoAimTypes get_AutoAimType(RE::Projectile* proj) { return get_runtime_data(proj).get_autoAimType(); }
+		auto get_AutoAimParam(RE::Projectile* proj) { return get_runtime_data(proj).get_AutoAimParam(); }
+		static bool is_AutoAimType(RE::Projectile* proj) { return get_runtime_data(proj).isAutoAim(); }
 	}
 	using Data::get_findTarget_data;
 	using Data::get_onCreate_data;
@@ -519,7 +508,26 @@ namespace AutoAim
 			a_matrix.entry[2][2] = cb;
 		}
 
-		void change_direction(RE::Projectile* proj, RE::NiPoint3*, float dtime)
+		void update_node_rotation(RE::Projectile* proj)
+		{
+			RE::NiPoint3 proj_dir = proj->linearVelocity;
+			proj_dir.Unitize();
+
+			proj->data.angle.x = asin(proj_dir.z);
+			proj->data.angle.z = atan2(proj_dir.x, proj_dir.y);
+
+			if (proj_dir.x < 0.0) {
+				proj->data.angle.x += 3.1415926f;
+			}
+
+			if (proj->data.angle.z < 0.0) {
+				proj->data.angle.z += 3.1415926f;
+			}
+
+			SetRotationMatrix(proj->Get3D2()->local.rotate, proj_dir.x, proj_dir.y, proj_dir.z);
+		}
+
+		void change_direction_linVel(RE::Projectile* proj, float dtime)
 		{
 			RE::NiPoint3 final_vel;
 			if (auto target = Targeting::findTarget(proj); target && get_shoot_dir(proj, target, dtime, final_vel)) {
@@ -535,36 +543,24 @@ namespace AutoAim
 				default:
 					break;
 				}
-
-#ifdef DEBUG
-				{
-					auto proj_dir = proj->linearVelocity;
-					proj_dir.Unitize();
-					draw_line<Colors::RED>(proj->GetPosition(), proj->GetPosition() + proj_dir);
-				}
-#endif  // DEBUG
-
-				// set node rotation
-				{
-					RE::NiPoint3 proj_dir = proj->linearVelocity;
-					proj_dir.Unitize();
-
-					proj->data.angle.x = asin(proj_dir.z);
-					proj->data.angle.z = atan2(proj_dir.x, proj_dir.y);
-
-					if (proj_dir.x < 0.0) {
-						proj->data.angle.x += 3.1415926f;
-					}
-
-					if (proj->data.angle.z < 0.0) {
-						proj->data.angle.z += 3.1415926f;
-					}
-
-					SetRotationMatrix(proj->Get3D2()->local.rotate, proj_dir.x, proj_dir.y, proj_dir.z);
-				}
 			} else {
 				AutoAim::Data::disable_AutoAim(proj);
 			}
+		}
+
+		void change_direction(RE::Projectile* proj, RE::NiPoint3*, float dtime)
+		{
+			change_direction_linVel(proj, dtime);
+
+			update_node_rotation(proj);
+
+#ifdef DEBUG
+			{
+				auto proj_dir = proj->linearVelocity;
+				proj_dir.Unitize();
+				draw_line<Colors::RED>(proj->GetPosition(), proj->GetPosition() + proj_dir);
+			}
+#endif  // DEBUG
 		}
 	}
 

@@ -5,8 +5,8 @@
 // Stored in RuntimeData
 enum class AutoAimTypes : uint32_t
 {
-	ConstSpeed = 1,
-	ConstAccel = 2
+	ConstSpeed,
+	ConstAccel
 };
 static constexpr AutoAimTypes AutoAimTypes__DEFAULT = AutoAimTypes::ConstSpeed;
 

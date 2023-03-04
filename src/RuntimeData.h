@@ -1,6 +1,7 @@
 #pragma once
 
 #include "AutoAim.h"
+#include "Following.h"
 #include "CustomFloats.h"
 
 class FenixProjsRuntimeData
@@ -22,6 +23,15 @@ public:
 		uint32_t AutoAimParam : AutoAimParam_t::SIZEOF;  // 01 -- accel or rot_speed
 	};
 	static_assert(1 + AutoAimParam_t::SIZEOF == MovingDataData_sizeof);
+
+	static constexpr inline uint32_t MovingDataFollowSize_sizeof = (MovingDataData_sizeof - 2) / 2;
+	struct MovingDataFollow
+	{
+		FollowTypes type: 2;                           // 00
+		uint32_t size : MovingDataFollowSize_sizeof;   // 02
+		uint32_t index : MovingDataFollowSize_sizeof;  // 05
+	};
+	static_assert(2 + MovingDataFollowSize_sizeof + MovingDataFollowSize_sizeof == MovingDataData_sizeof);
 
 	struct MovingData
 	{
@@ -65,6 +75,22 @@ public:
 			set_MovingData(data);
 		}
 
+		MovingDataFollow get_MovingDataFollow()
+		{
+			MovingData data = get_MovingData();
+			uint32_t val = data.data;
+			MovingDataFollow ans = *(MovingDataFollow*)&val;
+			return ans;
+		}
+
+		void set_MovingDataFollow(MovingDataFollow val)
+		{
+			uint32_t ans = *(uint32_t*)&val;
+			MovingData data = get_MovingData();
+			data.data = ans;
+			set_MovingData(data);
+		}
+
 	public:
 		void set_AutoAimParam(float val) {
 			MovingDataAim data = get_MovingDataAim();
@@ -81,6 +107,65 @@ public:
 		{
 			MovingData data = get_MovingData();
 			return data.type == MovingType::Aiming;
+		}
+
+		bool isFollow()
+		{
+			MovingData data = get_MovingData();
+			return data.type == MovingType::Following;
+		}
+
+		void enable_Follow()
+		{
+			if (isFollow())
+				return;
+
+			MovingData data = get_MovingData();
+			data.type = MovingType::Following;
+			set_MovingData(data);
+		}
+
+		void set_FollowType(FollowTypes follow_type)
+		{
+			MovingDataFollow data = get_MovingDataFollow();
+			data.type = follow_type;
+			set_MovingDataFollow(data);
+		}
+
+		void set_FollowSize(uint32_t size)
+		{
+			MovingDataFollow data = get_MovingDataFollow();
+			data.size = size;
+			set_MovingDataFollow(data);
+		}
+
+		void set_FollowIndex(uint32_t index)
+		{
+			MovingDataFollow data = get_MovingDataFollow();
+			data.index = index;
+			set_MovingDataFollow(data);
+		}
+
+		FollowTypes get_FollowType()
+		{
+			MovingDataFollow data = get_MovingDataFollow();
+			return data.type;
+		}
+
+		uint32_t get_FollowSize()
+		{
+			MovingDataFollow data = get_MovingDataFollow();
+			uint32_t ans = data.size;
+			if (ans == 0)
+				return 1 << MovingDataFollowSize_sizeof;
+			else
+				return ans;
+		}
+
+		uint32_t get_FollowIndex()
+		{
+			MovingDataFollow data = get_MovingDataFollow();
+			return data.index;
 		}
 
 		void disable_AutoAim()
@@ -123,6 +208,15 @@ public:
 		void set_EmitterKey(uint32_t runtime_key) { EmitterKey = runtime_key; }
 	};
 	static_assert(sizeof(Types) == 0x4);
+
+	bool isFollow() { return type.isFollow(); }
+	void enable_Follow() { type.enable_Follow(); }
+	void set_FollowType(FollowTypes aim_type) { type.set_FollowType(aim_type); }
+	void set_FollowSize(uint32_t size) { type.set_FollowSize(size); }
+	void set_FollowIndex(uint32_t index) { type.set_FollowIndex(index); }
+	FollowTypes get_FollowType() { return type.get_FollowType(); }
+	uint32_t get_FollowSize() { return type.get_FollowSize(); }
+	uint32_t get_FollowIndex() { return type.get_FollowIndex(); }
 
 	bool isAutoAim() { return type.isAutoAim(); }
 	void disable_AutoAim() { type.disable_AutoAim(); }

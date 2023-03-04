@@ -268,6 +268,8 @@ void read_json_mod(const Json::Value& mod_data, int hex) {
 			ManyProjs::add_mod(mod_data[type], hex);
 		else if (type == "Emitters")
 			Emitters::add_mod(mod_data[type], hex);
+		else if (type == "Following")
+			Following::add_mod(mod_data[type], hex);
 	}
 }
 
@@ -300,6 +302,7 @@ void reset_json() {
 	AutoAim::forget();
 	ManyProjs::forget();
 	Emitters::forget();
+	Following::forget();
 
 	read_json();
 }

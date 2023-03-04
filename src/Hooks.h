@@ -281,6 +281,7 @@ private:
 		if (auto proj = _refr.get() ? _refr.get()->As<RE::Projectile>() : nullptr) {
 			AutoAim::onCreated(proj);
 			Emitters::onCreated(proj);
+			Following::onCreated(proj);
 		}
 	}
 
