@@ -103,6 +103,8 @@ set(SOURCES
 	src/RuntimeData.cpp
 	src/JsonUtils.h
 	src/JsonUtils.cpp
+	src/Targeting.h
+	src/Targeting.cpp
 	src/Settings.h
 	src/CustomFloats.h
 	schema.json

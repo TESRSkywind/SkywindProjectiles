@@ -1,17 +1,11 @@
 #include "AutoAim.h"
 #include "Settings.h"
 #include "RuntimeData.h"
+#include "Targeting.h"
 
 namespace AutoAim
 {
-	// Stored in Json
-	enum class AutoAimTarget : uint32_t
-	{
-		Nearest,
-		Hostile,
-		Cursor
-	};
-	static constexpr AutoAimTarget AutoAimTarget__DEFAULT = AutoAimTarget::Nearest;
+	using Targeting::AimTargetType;
 
 	// Stored in Json
 	enum class AutoAimCaster : uint32_t
@@ -33,24 +27,15 @@ namespace AutoAim
 			// Stored in Json (in 2 maps), queried only at creation
 			struct JsonDataItem
 			{
-				AutoAimCaster caster: 2;  // 0:00
-				AutoAimTarget target: 2;  // 0:02
-				uint32_t detection_angle :
-					detection_angle_t::SIZEOF;  // 0:04 - for cursor target (0..90)
-				uint32_t acc_or_rottime :
-					acc_or_rottime_t::
-						SIZEOF;  // 0:0B - acc (* 0.1) or rottime (*0.01). in RuntimeData
-				uint32_t unused: 14;  // 0:12
+				AutoAimCaster caster: 2;                               // 0:00
+				AimTargetType target: 2;                               // 0:02
+				uint32_t detection_angle : detection_angle_t::SIZEOF;  // 0:04 - for cursor target (0..90)
+				uint32_t acc_or_rottime : acc_or_rottime_t::SIZEOF;    // 0:0B - acc (* 0.1) or rottime (*0.01). in RuntimeData
+				uint32_t unused: 14;                                   // 0:12
 
-				void set_detectionAngle(float val)
-				{
-					detection_angle = detection_angle_t::f2u(val);
-				}
+				void set_detectionAngle(float val) { detection_angle = detection_angle_t::f2u(val); }
 
-				float get_detectionAngle() const
-				{
-					return detection_angle_t::u2f(detection_angle);
-				}
+				float get_detectionAngle() const { return detection_angle_t::u2f(detection_angle); }
 
 				float get_accOrRottime(AutoAimTypes type) const
 				{
@@ -87,10 +72,9 @@ namespace AutoAim
 				JsonDataItem data;
 				data.caster =
 					parse_enum_ifIsMember<AutoAimCaster__DEFAULT>(item, "caster"sv);
-				data.target =
-					parse_enum_ifIsMember<AutoAimTarget__DEFAULT>(item, "target"sv);
+				data.target = Targeting::Data::read_json_entry(item);
 
-				data.set_detectionAngle(data.target == AutoAimTarget::Cursor ?
+				data.set_detectionAngle(data.target == AimTargetType::Cursor ?
 											item["cursorAngle"].asFloat() :
 											0.0f);
 
@@ -188,11 +172,11 @@ namespace AutoAim
 		// 2nd is param2 (angle)
 		auto get_findTarget_data(RE::TESBoundObject* bproj)
 		{
-			std::tuple<AutoAimTarget, float> ans;
+			std::tuple<AimTargetType, float> ans;
 
 			auto data = JsonStorage::query(bproj->formID);
 			const auto& json_data = std::get<JsonStorage::JsonDataItem>(data);
-			std::get<AutoAimTarget>(ans) = json_data.target;
+			std::get<AimTargetType>(ans) = json_data.target;
 			std::get<float>(ans) = json_data.get_detectionAngle();
 
 			return ans;
@@ -204,169 +188,6 @@ namespace AutoAim
 	}
 	using Data::get_findTarget_data;
 	using Data::get_onCreate_data;
-
-	namespace Targeting
-	{
-		namespace Cursor
-		{
-			static bool is_anglebetween_less(const RE::NiPoint3& A,
-				const RE::NiPoint3& B1, const RE::NiPoint3& B2, float angle_deg)
-			{
-				auto AB1 = B1 - A;
-				auto AB2 = B2 - A;
-				AB1.Unitize();
-				AB2.Unitize();
-				return acos(AB1.Dot(AB2)) < angle_deg / 180.0f * 3.1415926f;
-			}
-
-			static bool is_near_to_cursor(RE::Actor* caster, RE::Actor* target,
-				float angle)
-			{
-				RE::NiPoint3 caster_pos, caster_sight, target_pos;
-
-				FenixUtils::Actor__get_eye_pos(caster, caster_pos, 2);
-				FenixUtils::Actor__get_eye_pos(target, target_pos, 3);
-
-				caster_sight = caster_pos;
-				caster_sight += FenixUtils::rotate(1, caster->data.angle);
-
-				return is_anglebetween_less(caster_pos, caster_sight, target_pos, angle);
-			}
-
-			enum class LineOfSightLocation : std::uint32_t
-			{
-				kNone = 0,
-				kEyes = 1,   // Eye level
-				kHead = 2,   // 85%
-				kTorso = 3,  // 50%
-				kFeet = 4    // 15%
-			};
-			static_assert(sizeof(LineOfSightLocation) == 0x4);
-
-			static LineOfSightLocation IsActorInLineOfSight(RE::Actor* caster,
-				RE::Actor* target, float viewCone = 100)
-			{
-				return _generic_foo_<36752, decltype(IsActorInLineOfSight)>::eval(caster,
-					target, viewCone);
-			}
-
-			RE::TESObjectREFR* find_cursor_target(RE::TESObjectREFR* _caster, float angle)
-			{
-				if (!_caster->IsPlayerRef())
-					return nullptr;
-
-				auto caster = _caster->As<RE::Actor>();
-				std::vector<std::pair<RE::Actor*, float>> targets;
-
-				RE::TES::GetSingleton()->ForEachReference(
-					[caster, &targets, angle](RE::TESObjectREFR& _refr) {
-						if (auto refr = _refr.As<RE::Actor>();
-							refr && !_refr.IsDisabled() && !_refr.IsDead() &&
-							_refr.GetFormType() == RE::FormType::ActorCharacter &&
-							_refr.formID != caster->formID &&
-							is_near_to_cursor(caster, refr, angle)) {
-							if (IsActorInLineOfSight(caster, refr) !=
-								LineOfSightLocation::kNone) {
-								targets.push_back(
-									{ refr, caster->GetPosition().GetSquaredDistance(
-												refr->GetPosition()) });
-							}
-						}
-						return RE::BSContainer::ForEachResult::kContinue;
-					});
-
-				if (!targets.size())
-					return nullptr;
-
-				return (*std::min_element(targets.begin(), targets.end(),
-							[](const std::pair<RE::Actor*, float>& a,
-								const std::pair<RE::Actor*, float>& b) {
-								return a.second < b.second;
-							}))
-				    .first;
-			}
-		}
-
-		bool is_hostile(RE::TESObjectREFR* refr, RE::TESObjectREFR* _caster)
-		{
-			auto target = refr->As<RE::Actor>();
-			auto caster = _caster->As<RE::Actor>();
-			if (!target || !caster)
-				return false;
-
-			return target->currentCombatTarget.get().get() == caster;
-		}
-
-		RE::TESObjectREFR* find_nearest_target(RE::TESObjectREFR* caster,
-			RE::Projectile* proj, bool onlyHostile)
-		{
-			float mindist2 = 1.0E15f;
-			RE::TESObjectREFR* refr = nullptr;
-			RE::TES::GetSingleton()->ForEachReference(
-				[=, &mindist2, &refr](RE::TESObjectREFR& _refr) {
-					if (!_refr.IsDisabled() && !_refr.IsDead() &&
-						_refr.GetFormType() == RE::FormType::ActorCharacter &&
-						_refr.formID != caster->formID &&
-						(!onlyHostile || is_hostile(&_refr, caster))) {
-						float curdist =
-							proj->GetPosition().GetSquaredDistance(_refr.GetPosition());
-						if (curdist < mindist2) {
-							mindist2 = curdist;
-							refr = &_refr;
-						}
-					}
-					return RE::BSContainer::ForEachResult::kContinue;
-				});
-
-			if (!refr || mindist2 > proj->range * proj->range)
-				return nullptr;
-
-			return refr;
-		}
-
-		RE::Actor* findTarget(RE::Projectile* proj)
-		{
-			auto target = proj->desiredTarget.get().get();
-			if (target)
-				return target->As<RE::Actor>();
-
-			auto caster = proj->shooter.get().get();
-			if (!caster)
-				return nullptr;
-
-			if (auto caster_npc = caster->As<RE::Actor>();
-				caster_npc && !caster_npc->IsPlayerRef()) {
-				return caster_npc->currentCombatTarget.get().get();
-			}
-
-			RE::TESObjectREFR* refr;
-			auto data = get_findTarget_data(proj->GetBaseObject());
-			auto target_type = std::get<AutoAimTarget>(data);
-			switch (target_type) {
-			case AutoAimTarget::Nearest:
-			case AutoAimTarget::Hostile:
-				refr = find_nearest_target(caster, proj,
-					target_type == AutoAimTarget::Hostile);
-				break;
-			case AutoAimTarget::Cursor:
-				refr = Cursor::find_cursor_target(caster, std::get<float>(data));
-				break;
-			default:
-				refr = nullptr;
-				break;
-			}
-
-			if (!refr)
-				return nullptr;
-
-#ifdef DEBUG
-			FenixUtils::notification("Target found: %s", refr->GetName());
-#endif  // DEBUG
-
-			proj->desiredTarget = refr->GetHandle();
-			return refr->As<RE::Actor>();
-		}
-	}
 
 	namespace Moving
 	{
@@ -530,7 +351,8 @@ namespace AutoAim
 		void change_direction_linVel(RE::Projectile* proj, float dtime)
 		{
 			RE::NiPoint3 final_vel;
-			if (auto target = Targeting::findTarget(proj); target && get_shoot_dir(proj, target, dtime, final_vel)) {
+			auto target_data = get_findTarget_data(proj->GetBaseObject());
+			if (auto target = Targeting::findTarget(proj, target_data); target && get_shoot_dir(proj, target, dtime, final_vel)) {
 				auto type = Data::get_AutoAimType(proj);
 				auto param = Data::get_AutoAimParam(proj);
 				switch (type) {
@@ -708,7 +530,8 @@ namespace AutoAim
 					caster_type == AutoAimCaster::Player && isPlayer ||
 					caster_type == AutoAimCaster::Both) {
 					if (proj->IsBeamProjectile() || proj->IsFlameProjectile()) {
-						if (auto target = Targeting::findTarget(proj)) {
+						auto target_data = get_findTarget_data(proj->GetBaseObject());
+						if (auto target = Targeting::findTarget(proj, target_data)) {
 							auto dir = rot_at(proj->GetPosition(),
 								Moving::get_victim_pos(target, 0));
 

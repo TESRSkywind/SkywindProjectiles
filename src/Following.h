@@ -15,7 +15,7 @@ namespace Following
 	void onCreated(RE::Projectile* proj);
 
 	// Set `proj` following type with data from `key`. Usually key is formid
-	void onCreated(RE::Projectile* proj, uint32_t key);
+	void onCreated(RE::Projectile* proj, uint32_t key, int ind = -1);
 
 	// Before read json ingame
 	void forget();

@@ -7,10 +7,11 @@ struct NewProjType
 {
 	uint32_t emitter;
 	uint32_t homing;
+	uint32_t follower;
 
 	void init(const Json::Value& item);
 };
-static_assert(sizeof(NewProjType) == 0x8);
+static_assert(sizeof(NewProjType) == 0xC);
 
 using ProjectileRot = RE::Projectile::ProjectileRot;
 

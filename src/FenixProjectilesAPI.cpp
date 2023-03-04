@@ -14,6 +14,7 @@ void NewProjType::init(const Json::Value& item)
 
 		emitter = read_field("Emitter"sv);
 		homing = read_field("Homing"sv);
+		follower = read_field("Follower"sv);
 	} else {
 		*this = {};
 	}

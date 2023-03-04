@@ -185,7 +185,7 @@
         { "not": { "required": ["arrowID"] } },
         { "not": { "required": ["weapID"] } }
       ],
-      "description": "Data dor spell projectile"
+      "description": "Data for spell projectile"
     },
     "ArrowID": {
       "oneOf": [{ "$ref": "#/$defs/FormOrID" }, { "const": "Current" }],
@@ -196,7 +196,7 @@
       "description": "A weap that fires"
     },
     "MulticastArrow": {
-      "description": "Data dor spell projectile",
+      "description": "Data for spell projectile",
       "allOf": [
         { "required": ["weapID"] },
         { "not": { "required": ["spellID"] } }
@@ -232,11 +232,15 @@
       "properties": {
         "Emitter": {
           "$ref": "#/$defs/FormOrID",
-          "description": "Set th projectile to emitter with this key"
+          "description": "Set the projectile to emitter with this key"
         },
         "Homing": {
           "$ref": "#/$defs/FormOrID",
-          "description": "Set th projectile to homing with this key"
+          "description": "Set the projectile to homing with this key"
+        },
+        "Follower": {
+          "$ref": "#/$defs/FormOrID",
+          "description": "Set the projectile to following with this key"
         }
       },
       "additionalProperties": false

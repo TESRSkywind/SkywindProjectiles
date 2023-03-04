@@ -85,7 +85,7 @@ namespace Following
 
 		auto get_FollowSize(RE::Projectile* proj) { return get_runtime_data(proj).get_FollowSize(); }
 		auto get_FollowIndex(RE::Projectile* proj) { return get_runtime_data(proj).get_FollowIndex(); }
-		static bool is_FollowType(RE::Projectile* proj) { return get_runtime_data(proj).isFollow(); }
+		bool is_FollowType(RE::Projectile* proj) { return get_runtime_data(proj).isFollow(); }
 
 		// 3rd is size, 4th is index
 		auto get_onCreate_data(uint32_t key)
@@ -261,7 +261,31 @@ namespace Following
 
 	auto rot_at(const RE::NiPoint3& from, const RE::NiPoint3& to) { return rot_at(to - from); }
 
-	void onCreated(RE::Projectile* proj, uint32_t key)
+	uint32_t get_min_unused_index_ofType(RE::Projectile* proj, const RE::BSTArray<RE::ProjectileHandle>& a)
+	{
+		uint32_t baseID = proj->GetBaseObject()->formID;
+		uint32_t ans = 0;
+		for (auto& i : a) {
+			if (auto _proj = i.get().get(); _proj && _proj->GetBaseObject()->formID == baseID && _proj->formID != proj->formID) {
+				uint32_t ind = Data::get_FollowIndex(_proj);
+				ans = ind + 1;
+			}
+		}
+		return ans;
+	}
+
+	uint32_t get_min_unused_index_ofType(RE::Projectile* proj)
+	{
+		auto manager = RE::Projectile::Manager::GetSingleton();
+		uint32_t limitedID = get_min_unused_index_ofType(proj, manager->limited);
+		uint32_t pendingID = get_min_unused_index_ofType(proj, manager->pending);
+		uint32_t unlimitedID = get_min_unused_index_ofType(proj, manager->unlimited);
+		uint32_t freeID = std::max(limitedID, pendingID);
+		freeID = std::max(freeID, unlimitedID);
+		return freeID;
+	}
+
+	void onCreated(RE::Projectile* proj, uint32_t key, int ind)
 	{
 		if (auto data = get_onCreate_data(key); std::get<bool>(data)) {
 			if (auto caster = proj->shooter.get().get()) {
@@ -270,7 +294,12 @@ namespace Following
 				if (caster_type == FollowingCaster::NPC && !isPlayer || caster_type == FollowingCaster::Player && isPlayer ||
 					caster_type == FollowingCaster::Both) {
 					if (proj->IsMissileProjectile()) {
-						Data::set_FollowType(proj, FollowTypes::Nimbus, std::get<2>(data), std::get<3>(data));
+						uint32_t size = std::get<2>(data);
+						//uint32_t index = std::get<3>(data);
+						//uint32_t index = get_min_unused_index_ofType(proj);
+						uint32_t index = ind == -1 ? std::get<3>(data) : ind;
+						if (index < size)
+							Data::set_FollowType(proj, FollowTypes::Nimbus, size, index);
 					}
 				}
 			}

@@ -181,7 +181,7 @@ namespace Emitters
 			break;
 		case FunctionTypes::ChangeType:
 			{
-				auto new_types = std::get<NewProjType>(data);
+				auto& new_types = std::get<NewProjType>(data);
 
 				auto emitter_key = new_types.emitter;
 				if (emitter_key != 0) {

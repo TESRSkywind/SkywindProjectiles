@@ -2,6 +2,7 @@
 #include "NewProjectiles.h"
 #include "AutoAim.h"
 #include "Emittors.h"
+#include "Following.h"
 
 namespace ManyProjs
 {
@@ -84,7 +85,7 @@ namespace ManyProjs
 				std::variant<SpellData, ArrowData> data;  // 38
 				NewProjType newtypes;                     // 44
 			};
-			static_assert(sizeof(JsonDataItem) == 0x4C);
+			static_assert(sizeof(JsonDataItem) == 0x50);
 
 		private:
 			struct MapEntry
@@ -615,19 +616,15 @@ namespace ManyProjs
 				Sounds::play_cast_sound(cast_data.caster,
 					std::get<CastData::SpellData>(cast_data.data).spel, spawn_center);
 			
-			uint32_t key_emitter = read_default<(uint32_t)0, (uint32_t)0>(
-				data.newtypes.emitter, data_def.newtypes.emitter);
-			uint32_t key_homing = read_default<(uint32_t)0, (uint32_t)0>(
-				data.newtypes.homing, data_def.newtypes.homing);
-			
-			bool need_changetype = key_emitter != 0 || key_homing != 0;
+			auto read_key = [](uint32_t data_newtypes_field, uint32_t data_def_newtypes_field) {
+				return read_default<(uint32_t)0, (uint32_t)0>(data_newtypes_field, data_def_newtypes_field);
+			};
 
-			//using namespace AutoAim;
-			//AutoAim::JsonData autoaimdata;
-			//autoaimdata.caster = AutoAimCaster::Both;
-			//autoaimdata.param1 = set_AutoAimParam1;
-			//autoaimdata.param2 = 0;
-			//autoaimdata.target = AutoAimTarget::Hostile;
+			uint32_t key_emitter = read_key(data.newtypes.emitter, data_def.newtypes.emitter);
+			uint32_t key_homing = read_key(data.newtypes.homing, data_def.newtypes.homing);
+			uint32_t key_follower = read_key(data.newtypes.follower, data_def.newtypes.follower);
+			
+			bool need_changetype = key_emitter != 0 || key_homing != 0 || key_follower != 0;
 
 			for (uint32_t i = 0; i < points.size(); ++i) {
 				auto handle = multiCastGroupItem(get_rot, points[i], data, cast_data,
@@ -640,6 +637,9 @@ namespace ManyProjs
 					
 						if (key_emitter)
 							Emitters::onCreated(proj, key_emitter);
+
+						if (key_follower)
+							Following::onCreated(proj, key_follower, i);
 					}
 				}
 			}
