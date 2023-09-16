@@ -3,6 +3,7 @@
 #include "NewProjectiles.h"
 #include "RuntimeData.h"
 #include "Emittors.h"
+#include "FastEmitter.h"
 
 class PaddingsProjectileHook
 {
@@ -33,39 +34,7 @@ private:
 	static inline REL::Relocation<decltype(Ctor)> _TESForm__SetInitedFormFlag_140194B90;
 	static inline REL::Relocation<decltype(LoadGame)> _TESObjectREFR__ReadFromSaveGame_140286FD0;
 };
-/*
-class InitStartPosHook
-{
-public:
-	static void Hook()
-	{
-		auto& trmpl = SKSE::GetTrampoline();
 
-		_TESObjectREFR__SetPosition_140296910 =
-			trmpl.write_call<5>(REL::ID(43030).address() + 0x215, InitStartPos);          // SkyrimSE.exe+754A35
-		_mb_autoaim = trmpl.write_call<5>(REL::ID(43009).address() + 0x201, mb_autoaim);  // SkyrimSE.exe+7518E1
-	}
-
-private:
-	static void InitStartPos(RE::Projectile* proj, RE::NiPoint3* pos)
-	{
-		if (!is_CustomPosType(proj)) {
-			_TESObjectREFR__SetPosition_140296910(proj, pos);
-		}
-	}
-
-	static void mb_autoaim(RE::PlayerCharacter* player, RE::Projectile* proj, RE::NiAVObject* player_bone, float* dir1,
-		float* dir2, RE::NiPoint3* a7, float a8, float a9)
-	{
-		if (!is_CustomPosType(proj)) {
-			_mb_autoaim(player, proj, player_bone, dir1, dir2, a7, a8, a9);
-		}
-	}
-
-	static inline REL::Relocation<decltype(InitStartPos)> _TESObjectREFR__SetPosition_140296910;
-	static inline REL::Relocation<decltype(mb_autoaim)> _mb_autoaim;
-};
-*/
 class MultipleBeamsHook
 {
 public:
@@ -247,13 +216,14 @@ public:
 	}
 
 private:
-	static RE::BeamProjectile* Ctor(RE::BeamProjectile* proj, void* LaunchData) {
-		proj = _BeamProjectile__ctor(proj, LaunchData);
-		if (auto spell = proj->spell; spell && spell->GetCastingType() == RE::MagicSystem::CastingType::kFireAndForget) {
-			proj->flags.set(RE::Projectile::Flags::kUseOrigin);
-			proj->flags.reset(RE::Projectile::Flags::kAutoAim);
+	static RE::BeamProjectile* Ctor(RE::BeamProjectile* proj, RE::Projectile::LaunchData* ldata)
+	{
+		if (auto spell = ldata->spell; spell && spell->GetCastingType() == RE::MagicSystem::CastingType::kFireAndForget) {
+			ldata->useOrigin = true;
+			ldata->autoAim = false;
 		}
-		return proj;
+
+		return _BeamProjectile__ctor(proj, ldata);
 	}
 
 	static inline REL::Relocation<decltype(Ctor)> _BeamProjectile__ctor;
@@ -332,4 +302,25 @@ private:
 	}
 
 	static inline REL::Relocation<decltype(Update)> _Update;
+};
+
+class ProjTestHook
+{
+public:
+	static void Hook()
+	{
+		_get_bhkCollisionObject = SKSE::GetTrampoline().write_call<5>(REL::ID(42547).address() + 0x9f,
+			get_bhkCollisionObject);  // SkyrimSE.exe+73249F
+	}
+
+private:
+	static void* get_bhkCollisionObject(RE::NiNode* node)
+	{
+		draw_point(node->world.translate);
+		logger::info("{}", node->name.c_str());
+
+		return _get_bhkCollisionObject(node);
+	}
+
+	static inline REL::Relocation<decltype(get_bhkCollisionObject)> _get_bhkCollisionObject;
 };

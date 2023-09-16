@@ -136,8 +136,7 @@ namespace AutoAim
 		};
 
 		// Set runtime data type and param
-		void set_AutoAimType(RE::Projectile* proj, AutoAimTypes type,
-			float acc_or_speed)
+		void set_AutoAimType(RE::Projectile* proj, AutoAimTypes type, float acc_or_speed)
 		{
 			get_runtime_data(proj).enable_AutoAim();
 			get_runtime_data(proj).set_AutoAimType(type);
@@ -504,39 +503,39 @@ namespace AutoAim
 		return rot_at(to - from);
 	}
 
-	void onCreated(RE::Projectile* proj, uint32_t key)
+	bool onCreated(RE::Projectile* proj, uint32_t key)
 	{
-		if (auto data = get_onCreate_data(key);
-			std::get<bool>(data)) {
+		if (auto data = get_onCreate_data(key); std::get<bool>(data)) {
 			if (auto caster = proj->shooter.get().get()) {
 				bool isPlayer = caster->IsPlayerRef();
 				auto caster_type = std::get<AutoAimCaster>(data);
-				if (caster_type == AutoAimCaster::NPC && !isPlayer ||
-					caster_type == AutoAimCaster::Player && isPlayer ||
+				if (caster_type == AutoAimCaster::NPC && !isPlayer || caster_type == AutoAimCaster::Player && isPlayer ||
 					caster_type == AutoAimCaster::Both) {
 					if (proj->IsBeamProjectile() || proj->IsFlameProjectile()) {
 						auto target_data = get_findTarget_data(proj->GetBaseObject());
 						if (auto target = Targeting::findTarget(proj, target_data)) {
-							auto dir = rot_at(proj->GetPosition(),
-								Targeting::get_victim_pos(target));
+							auto dir = rot_at(proj->GetPosition(), Targeting::get_victim_pos(target));
 
-							_generic_foo_<19362, void(RE::TESObjectREFR * refr,
-													 float rot_Z)>::eval(proj, dir.z);
-							_generic_foo_<19360, void(RE::TESObjectREFR * refr,
-													 float rot_X)>::eval(proj, dir.x);
+							_generic_foo_<19362, void(RE::TESObjectREFR * refr, float rot_Z)>::eval(proj, dir.z);
+							_generic_foo_<19360, void(RE::TESObjectREFR * refr, float rot_X)>::eval(proj, dir.x);
+
+							return true;
 						}
 					}
 
 					if (proj->IsMissileProjectile()) {
-						Data::set_AutoAimType(proj, std::get<AutoAimTypes>(data),
-							std::get<float>(data));
+						Data::set_AutoAimType(proj, std::get<AutoAimTypes>(data), std::get<float>(data));
+
+						return true;
 					}
 				}
 			}
 		}
+
+		return false;
 	}
 
-	void onCreated(RE::Projectile* proj)
+	bool onCreated(RE::Projectile* proj)
 	{
 		return onCreated(proj, proj->GetBaseObject()->formID);
 	}

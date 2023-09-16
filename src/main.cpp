@@ -51,6 +51,8 @@ extern "C" DLLEXPORT bool SKSEAPI SKSEPlugin_Query(const SKSE::QueryInterface* a
 #include "Following.h"
 #include "Multicast.h"
 #include "Emittors.h"
+#include "FastEmitter.h"
+#include "Capturing.h"
 
 class InputHandler : public RE::BSTEventSink<RE::InputEvent*>
 {
@@ -96,7 +98,9 @@ static void SKSEMessageHandler(SKSE::MessagingInterface::Message* message)
 
 		PaddingsProjectileHook::Hook();
 		MultipleBeamsHook::Hook();
+		Capturing::Hooks::CapturingHook::Hook();
 		//MultipleFlamesHook::Hook();
+		//ProjTestHook::Hook();
 
 		if (Settings::NormLightingsEnabled)
 			NormLightingsHook::Hook();
@@ -107,6 +111,7 @@ static void SKSEMessageHandler(SKSE::MessagingInterface::Message* message)
 		Following::install();
 		ManyProjs::install();
 		Emitters::install();
+		FastEmitters::install();
 
 		if (Settings::Enable) {
 			DebugAPIHook::Hook();

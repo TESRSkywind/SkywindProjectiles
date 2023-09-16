@@ -105,6 +105,10 @@ set(SOURCES
 	src/JsonUtils.cpp
 	src/Targeting.h
 	src/Targeting.cpp
+	src/FastEmitter.h
+	src/FastEmitter.cpp
+	src/Capturing.h
+	src/Capturing.cpp
 	src/Settings.h
 	src/CustomFloats.h
 	schema.json

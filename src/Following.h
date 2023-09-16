@@ -5,12 +5,16 @@
 enum class FollowTypes : uint32_t
 {
 	Nimbus,
-	Shield,
-	Round
+	Hand,
+	Unused2,
+	Unused3
 };
 
 namespace Following
 {
+	// set runtime data without check
+	void onCreated(RE::Projectile* proj, FollowTypes type, uint32_t size = 0, uint32_t index = 0);
+
 	// init, if needed, runtime data for following projs
 	void onCreated(RE::Projectile* proj);
 

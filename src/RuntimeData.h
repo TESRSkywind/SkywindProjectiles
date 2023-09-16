@@ -3,12 +3,15 @@
 #include "AutoAim.h"
 #include "Following.h"
 #include "CustomFloats.h"
+#include "FastEmitter.h"
 
 class FenixProjsRuntimeData
 {
 public:
 	using AutoAimParam_t = CustomFloat<4, 3>;
 	using EmitterInterval_t = CustomFloat<4, 4>;
+
+	using FastEmitterTypes = FastEmitters::Types;
 
 	enum class MovingType: uint32_t
 	{
@@ -45,7 +48,8 @@ public:
 		uint32_t moving_data : MovingData_sizeof;              // 0:00 -- Aim or Follow
 		uint32_t EmitterInterval : EmitterInterval_t::SIZEOF;  // 0:0A -- 0 if disabled
 		uint32_t EmitterKey: 8;                                // 0:12
-		uint32_t unused: 6;                                    // 0:1A
+		FastEmitterTypes FastEmitterType: 2;                   // 0:1A
+		uint32_t unused: 4;                                    // 0:1C
 
 	private:
 		MovingData get_MovingData()
@@ -125,6 +129,16 @@ public:
 			set_MovingData(data);
 		}
 
+		void disable_Follow()
+		{
+			if (!isFollow())
+				return;
+
+			MovingData data = get_MovingData();
+			data.type = MovingType::None;
+			set_MovingData(data);
+		}
+
 		void set_FollowType(FollowTypes follow_type)
 		{
 			MovingDataFollow data = get_MovingDataFollow();
@@ -200,6 +214,9 @@ public:
 			set_MovingDataAim(data);
 		}
 
+		FastEmitterTypes get_FastEmitterType() { return FastEmitterType; }
+		void set_FastEmitterType(FastEmitterTypes type) { FastEmitterType = type; }
+
 		void set_EmitterInterval(float val) { EmitterInterval = EmitterInterval_t::f2u(val); }
 
 		float get_EmitterInterval() { return EmitterInterval_t::u2f(EmitterInterval); }
@@ -210,11 +227,12 @@ public:
 	static_assert(sizeof(Types) == 0x4);
 
 	bool isFollow() { return type.isFollow(); }
+	void disable_Follow() { type.disable_Follow(); }
 	void enable_Follow() { type.enable_Follow(); }
 	void set_FollowType(FollowTypes aim_type) { type.set_FollowType(aim_type); }
 	void set_FollowSize(uint32_t size) { type.set_FollowSize(size); }
 	void set_FollowIndex(uint32_t index) { type.set_FollowIndex(index); }
-	FollowTypes get_FollowType() { return type.get_FollowType(); }
+	auto get_FollowType() { return type.get_FollowType(); }
 	uint32_t get_FollowSize() { return type.get_FollowSize(); }
 	uint32_t get_FollowIndex() { return type.get_FollowIndex(); }
 
@@ -230,6 +248,9 @@ public:
 	auto get_EmitterInterval() { return type.get_EmitterInterval(); }
 	auto get_EmitterKey() { return type.get_EmitterKey(); }
 	void set_EmitterKey(uint32_t runtime_key) { type.set_EmitterKey(runtime_key); }
+
+	FastEmitterTypes get_FastEmitterType() { return type.get_FastEmitterType(); }
+	void set_FastEmitterType(FastEmitterTypes _type) { return type.set_FastEmitterType(_type); }
 
 	void set_NormalType() { (uint32_t&)type = 0; }
 

@@ -398,6 +398,25 @@
         "required": ["NewProjType"]
       }
     },
+    "ifEmittersFindTargetType": {
+      "$comment": "Target type",
+      "if": {
+        "properties": {
+          "type": { "const": "FindTarget" }
+        },
+        "required": ["type"]
+      },
+      "then": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "pattern": "^0x[0-9a-fA-F]{1,8}$|^(key_)",
+            "description": "ID of the function to call"
+          }
+        },
+        "required": ["key"]
+      }
+    },
     "EmittersData": {
       "type": "object",
       "description": "Emitters data. Used while searching by bproj.formID or just key",
@@ -409,13 +428,14 @@
           "maximum": 20
         },
         "type": {
-          "enum": ["Multicast", "ChangeType", "Fire"],
+          "enum": ["Multicast", "ChangeType", "FindTarget"],
           "description": "A function to call"
         }
       },
       "allOf": [
         { "$ref": "#/$defs/ifEmittersMulticastType" },
-        { "$ref": "#/$defs/ifEmittersChangeTypeType" }
+        { "$ref": "#/$defs/ifEmittersChangeTypeType" },
+        { "$ref": "#/$defs/ifEmittersFindTargetType" }
       ],
       "required": ["type", "interval"],
       "unevaluatedProperties": false

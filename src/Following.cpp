@@ -85,7 +85,9 @@ namespace Following
 
 		auto get_FollowSize(RE::Projectile* proj) { return get_runtime_data(proj).get_FollowSize(); }
 		auto get_FollowIndex(RE::Projectile* proj) { return get_runtime_data(proj).get_FollowIndex(); }
+		auto get_FollowType(RE::Projectile* proj) { return get_runtime_data(proj).get_FollowType(); }
 		bool is_FollowType(RE::Projectile* proj) { return get_runtime_data(proj).isFollow(); }
+		void disable_Follow(RE::Projectile* proj) { get_runtime_data(proj).disable_Follow(); }
 
 		// 3rd is size, 4th is index
 		auto get_onCreate_data(uint32_t key)
@@ -150,15 +152,54 @@ namespace Following
 			SetRotationMatrix(proj->Get3D2()->local.rotate, proj_dir.x, proj_dir.y, proj_dir.z);
 		}
 
-		void change_direction_linVel(RE::Projectile* proj, float)
-		{
+		auto get_target_point_hand(RE::Projectile* proj) {
+			RE::NiPoint3 final_vel;
+			auto caster = proj->shooter.get().get()->As<RE::Actor>();
+			auto mcaster = caster->GetMagicCaster(RE::MagicSystem::CastingSource::kRightHand);
+			auto node = mcaster->GetMagicNode();
+			const auto& spawn_center = node->world.translate;
+			auto cast_dir = FenixUtils::rotate(1, caster->data.angle);
+
+			RE::NiPoint3 right_dir = RE::NiPoint3(0, 0, -1).UnitCross(cast_dir);
+			if (right_dir.SqrLength() == 0)
+				right_dir = { 1, 0, 0 };
+			RE::NiPoint3 up_dir = right_dir.Cross(cast_dir);
+
+			uint32_t count = 10;
+			auto Foo = [&spawn_center, &right_dir, &up_dir, &count]() -> std::vector<RE::NiPoint3> {
+				std::vector<RE::NiPoint3> ans;
+				float size = 10.0f;
+				for (uint32_t i = 0; i < count; i++) {
+					float alpha = 2 * 3.1415926f / count * i;
+
+					auto cur_p = spawn_center + right_dir * cos(alpha) * size + up_dir * sin(alpha) * size;
+
+					ans.push_back(cur_p);
+				}
+				return ans;
+			};
+
+			auto points = Foo();
+
+#ifdef DEBUG
+			{
+				for (const auto& i : points) {
+					draw_point0(i);
+				}
+			}
+#endif  // DEBUG
+
+			return points[Data::get_FollowIndex(proj)];
+		}
+
+		auto get_target_point_circle(RE::Projectile* proj) {
 			RE::NiPoint3 final_vel;
 			auto _caster = proj->shooter.get().get();
-			if (!_caster)
-				return;
+			//if (!_caster)
+			//	return;
 			auto caster = _caster->As<RE::Actor>();
 
-			auto spawn_center = caster->GetPosition() + RE::NiPoint3{0,0,200};
+			auto spawn_center = caster->GetPosition() + RE::NiPoint3{ 0, 0, 200 };
 			auto cast_dir = FenixUtils::rotate(1, caster->data.angle);
 
 			RE::NiPoint3 right_dir = RE::NiPoint3(0, 0, -1).UnitCross(cast_dir);
@@ -181,8 +222,6 @@ namespace Following
 			};
 
 			auto points = Foo();
-			uint32_t ind = Data::get_FollowIndex(proj);
-			const auto& target_pos = points[ind];
 
 #ifdef DEBUG
 			{
@@ -192,6 +231,11 @@ namespace Following
 			}
 #endif  // DEBUG
 
+			return points[Data::get_FollowIndex(proj)];
+		}
+
+		void change_direction_linVel(RE::Projectile* proj, const RE::NiPoint3& target_pos)
+		{
 			auto dir = target_pos - proj->GetPosition();
 			auto dist = dir.Unitize();
 			auto speed_origin = get_proj_speed(proj);
@@ -200,9 +244,35 @@ namespace Following
 			proj->linearVelocity = dir * speed;
 		}
 
-		void change_direction(RE::Projectile* proj, RE::NiPoint3*, float dtime)
+		void change_direction(RE::Projectile* proj, RE::NiPoint3*, float)
 		{
-			change_direction_linVel(proj, dtime);
+			auto type = Data::get_FollowType(proj);
+
+			if (type == FollowTypes::Hand) {
+				auto caster = proj->shooter.get().get()->As<RE::Actor>();
+				if (!caster->IsCasting(RE::TESForm::LookupByID<RE::SpellItem>(0x12FCC))) {
+					auto cast_dir = FenixUtils::rotate(100, caster->data.angle);
+					proj->linearVelocity = cast_dir;
+					FastEmitters::onCreated(proj, FastEmitters::Types::AccelerateToMaxSpeed);
+					Data::disable_Follow(proj);
+					auto proj_dir = proj->linearVelocity;
+					proj_dir.Unitize();
+					update_node_rotation(proj, proj_dir);
+					return;
+				}
+			}
+
+			RE::NiPoint3 target_pos;
+			switch (type) {
+			case FollowTypes::Nimbus:
+				target_pos = get_target_point_circle(proj);
+				break;
+			case FollowTypes::Hand:
+				target_pos = get_target_point_hand(proj);
+			default:
+				break;
+			}
+			change_direction_linVel(proj, target_pos);
 
 			RE::NiPoint3 proj_dir;
 			if (proj->linearVelocity.SqrLength() > 30.0f) {
@@ -212,14 +282,6 @@ namespace Following
 			}
 			proj_dir.Unitize();
 			update_node_rotation(proj, proj_dir);
-
-#ifdef DEBUG
-			{
-				auto _proj_dir = proj->linearVelocity;
-				_proj_dir.Unitize();
-				draw_line<Colors::RED>(proj->GetPosition(), proj->GetPosition() + _proj_dir);
-			}
-#endif  // DEBUG
 		}
 	}
 
@@ -267,10 +329,10 @@ namespace Following
 
 	uint32_t get_min_unused_index_ofType(RE::Projectile* proj, const RE::BSTArray<RE::ProjectileHandle>& a)
 	{
-		uint32_t baseID = proj->GetBaseObject()->formID;
+		auto baseType = Data::get_FollowType(proj);
 		uint32_t ans = 0;
 		for (auto& i : a) {
-			if (auto _proj = i.get().get(); _proj && _proj->GetBaseObject()->formID == baseID && _proj->formID != proj->formID) {
+			if (auto _proj = i.get().get(); _proj && Data::get_FollowType(_proj) == baseType && _proj->formID != proj->formID) {
 				uint32_t ind = Data::get_FollowIndex(_proj);
 				ans = ind + 1;
 			}
@@ -289,6 +351,15 @@ namespace Following
 		return freeID;
 	}
 
+	void onCreated(RE::Projectile* proj, FollowTypes type, uint32_t size, uint32_t index)
+	{
+		if (proj->IsMissileProjectile()) {
+			if (index == UINT32_MAX)
+				index = get_min_unused_index_ofType(proj);
+			Data::set_FollowType(proj, type, size, index);
+		}
+	}
+
 	void onCreated(RE::Projectile* proj, uint32_t key, int ind)
 	{
 		if (auto data = get_onCreate_data(key); std::get<bool>(data)) {
@@ -297,14 +368,12 @@ namespace Following
 				auto caster_type = std::get<FollowingCaster>(data);
 				if (caster_type == FollowingCaster::NPC && !isPlayer || caster_type == FollowingCaster::Player && isPlayer ||
 					caster_type == FollowingCaster::Both) {
-					if (proj->IsMissileProjectile()) {
-						uint32_t size = std::get<2>(data);
-						//uint32_t index = std::get<3>(data);
-						//uint32_t index = get_min_unused_index_ofType(proj);
-						uint32_t index = ind == -1 ? std::get<3>(data) : ind + std::get<3>(data);
-						if (index < size)
-							Data::set_FollowType(proj, FollowTypes::Nimbus, size, index);
-					}
+					uint32_t size = std::get<2>(data);
+					//uint32_t index = std::get<3>(data);
+					//uint32_t index = get_min_unused_index_ofType(proj);
+					uint32_t index = ind == -1 ? std::get<3>(data) : ind + std::get<3>(data);
+					if (index < size)
+						onCreated(proj, FollowTypes::Nimbus, size, index);
 				}
 			}
 		}

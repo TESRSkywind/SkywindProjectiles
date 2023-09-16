@@ -1,6 +1,7 @@
 #include "RuntimeData.h"
 #include "Multicast.h"
 #include "AutoAim.h"
+#include "Targeting.h"
 
 namespace Emitters
 {
@@ -8,22 +9,25 @@ namespace Emitters
 	{
 		class JsonStorage
 		{
+			using AimTargetType = Targeting::AimTargetType;
+
 		public:
 			// What can happend in update
 			enum class FunctionTypes : uint32_t
 			{
 				Multicast,
-				ChangeType
+				ChangeType,
+				FindTarget
 			};
 
-			using JsonDataItem_data_t = std::variant<uint32_t, NewProjType>;  // FunctionTypes
+			using JsonDataItem_data_t = std::variant<uint32_t, NewProjType, uint32_t>;  // FunctionTypes
 
 		private:
 			// Stored in Json, queried every function call
 			struct JsonDataItem
 			{
 				float interval;            // in RuntimeData
-				JsonDataItem_data_t data;  // Multicast: key; ChangeType: NewProjType
+				JsonDataItem_data_t data;  // Multicast: key; ChangeType: NewProjType; FindTarget: key
 			};
 
 			using Map_t = std::unordered_map<uint32_t, JsonDataItem>;
@@ -42,12 +46,14 @@ namespace Emitters
 					parse_enum<FunctionTypes::Multicast>(item["type"].asString());
 				switch (type) {
 				case FunctionTypes::Multicast:
-					std::get<uint32_t>(data.data) =
-						JsonUtils::get_formid(item["key"].asString());
+					data.data = JsonDataItem_data_t(std::in_place_index<0>, JsonUtils::get_formid(item["key"].asString()));
 					break;
 				case FunctionTypes::ChangeType:
 					data.data = NewProjType{};
 					std::get<NewProjType>(data.data).init(item);
+					break;
+				case FunctionTypes::FindTarget:
+					data.data = JsonDataItem_data_t(std::in_place_index<2>, JsonUtils::get_formid(item["key"].asString()));
 					break;
 				default:
 					break;
@@ -67,8 +73,7 @@ namespace Emitters
 			static void init(const Json::Value& emitters, int hex)
 			{
 				for (auto& formid : emitters.getMemberNames()) {
-					read_json_entry(emitters[formid],
-						hex | JsonUtils::get_formid(formid));
+					read_json_entry(emitters[formid], hex | JsonUtils::get_formid(formid));
 				}
 			}
 
@@ -105,8 +110,7 @@ namespace Emitters
 			// function_key
 			static JsonDataItem_data_t query_update(uint32_t runtime_key)
 			{
-				if (auto found = EmittersData.find(runtime_key);
-					found != EmittersData.end()) {
+				if (auto found = EmittersData.find(runtime_key); found != EmittersData.end()) {
 					return (*found).second.data;
 				}
 
@@ -151,8 +155,7 @@ namespace Emitters
 
 	auto rot_at(const RE::NiPoint3& from, const RE::NiPoint3& to) { return rot_at(to - from); }
 
-	void call_func(RE::Projectile* proj, Data::JsonStorage::JsonDataItem_data_t data,
-		RE::Actor* caster)
+	void call_func(RE::Projectile* proj, Data::JsonStorage::JsonDataItem_data_t data, RE::Actor* caster)
 	{
 		using FunctionTypes = Data::JsonStorage::FunctionTypes;
 
@@ -160,7 +163,7 @@ namespace Emitters
 		switch (type) {
 		case FunctionTypes::Multicast:
 			{
-				auto function_key = std::get<uint32_t>(data);
+				auto function_key = std::get<0>(data);
 				auto curpos = proj->GetPosition();
 
 				ManyProjs::Casting::CastData cast_data;
@@ -202,6 +205,13 @@ namespace Emitters
 				}
 			}
 			break;
+		case FunctionTypes::FindTarget:
+			{
+				auto function_key = std::get<2>(data);
+				AutoAim::onCreated(proj, function_key);
+				FastEmitters::onCreated(proj, FastEmitters::Types::AccelerateToMaxSpeed);
+			}
+			break;
 		default:
 			break;
 		}
@@ -210,7 +220,7 @@ namespace Emitters
 	void onUpdate(RE::Projectile* proj, float)
 	{
 		auto _caster = proj->shooter.get().get();
-		if (!_caster || !_caster->As<RE::Actor>() || proj->distanceMoved > 10000) {
+		if (!_caster || !_caster->As<RE::Actor>()) {
 			Data::set_normalType(proj);
 			return;
 		}

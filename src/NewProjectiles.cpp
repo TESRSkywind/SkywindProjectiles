@@ -4,6 +4,7 @@
 #include "AutoAim.h"
 #include "Multicast.h"
 #include "Emittors.h"
+#include "FastEmitter.h"
 
 namespace Sounds
 {
